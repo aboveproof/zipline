@@ -71,6 +71,7 @@ export default function DashboardFileType({
   code,
   allowZoom,
   fullscreen,
+  unframed,
   scrollParent,
   onFullscreenBackdropClick,
 }: {
@@ -80,6 +81,7 @@ export default function DashboardFileType({
   code?: boolean;
   allowZoom?: boolean;
   fullscreen?: boolean;
+  unframed?: boolean;
   scrollParent?: HTMLElement | null;
   onFullscreenBackdropClick?: () => void;
 }) {
@@ -249,10 +251,10 @@ export default function DashboardFileType({
         <Placeholder text={t('preview.clickToViewText', { name: file.name })} Icon={fileIcon(file.type)} />
       );
 
-    if (fileContent.trim() === '') {
+    if (fileContent === undefined) {
       return (
         <LoadingOverlay
-          visible={fileContent.trim() === ''}
+          visible
           loaderProps={{
             children: (
               <>
@@ -270,12 +272,13 @@ export default function DashboardFileType({
     }
 
     return (
-      <FullscreenFrame fullscreen={fullscreen} parent={scrollParent}>
+      <FullscreenFrame fullscreen={fullscreen && !unframed} parent={scrollParent}>
         <Render
           mode={renderIn}
           language={extension}
           code={fileContent}
           noClamp={fullscreen}
+          unframed={unframed}
           scrollParent={scrollParent}
         />
       </FullscreenFrame>
