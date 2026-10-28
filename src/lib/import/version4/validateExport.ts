@@ -1,5 +1,10 @@
 import { oauthProviderTypeValues, roleValues, userFilesQuotaValues } from '@/lib/db/enums';
 import type { Zipline } from '@/lib/db/schema';
+import {
+  discordComponentEmbedSchema,
+  discordFilePreviewModeSchema,
+  discordUrlPreviewModeSchema,
+} from '@/lib/discord';
 import { z } from 'zod';
 
 export type Export4 = z.infer<typeof export4Schema>;
@@ -151,6 +156,8 @@ export const export4Schema = z.object({
         maxViews: z.number().nullish(),
         password: z.string().nullish(),
         enabled: z.boolean(),
+        discordPreviewMode: discordUrlPreviewModeSchema.optional(),
+        discordComponentEmbed: discordComponentEmbedSchema.nullish(),
         userId: z.string().nullish(),
       }),
     ),
@@ -170,6 +177,8 @@ export const export4Schema = z.object({
         maxViews: z.number().nullish(),
         favorite: z.boolean(),
         password: z.string().nullish(),
+        discordPreviewMode: discordFilePreviewModeSchema.nullish(),
+        discordComponentEmbed: discordComponentEmbedSchema.nullish(),
         userId: z.string().nullable(),
         folderId: z.string().nullish(),
       }),

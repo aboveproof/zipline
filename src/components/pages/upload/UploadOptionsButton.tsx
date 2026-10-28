@@ -1,10 +1,13 @@
 import { useConfig } from '@/components/ConfigProvider';
+import DiscordComponentEmbedBuilder from '@/components/DiscordComponentEmbedBuilder';
 import DomainSelect from '@/components/DomainSelect';
+import SafeTrans from '@/components/SafeTrans';
 import FolderComboboxOptions from '@/components/folders/FolderComboboxOptions';
 import { Response } from '@/lib/api/response';
-import { buildFolderHierarchy } from '@/lib/folderHierarchy';
 import { useFolders } from '@/lib/client/hooks/useFolders';
-import { useUploadOptionsStore } from '@/lib/client/store/uploadOptions';
+import { useUploadOptionsStore, type UploadOptionsStore } from '@/lib/client/store/uploadOptions';
+import { buildFolderHierarchy } from '@/lib/folderHierarchy';
+import i18n from '@/lib/i18n';
 import {
   Badge,
   Button,
@@ -33,12 +36,9 @@ import {
   IconTrashFilled,
   IconWriting,
 } from '@tabler/icons-react';
-
 import ms from 'ms';
 import { useEffect, useMemo, useState } from 'react';
-import i18n from '@/lib/i18n';
 import { useTranslation } from 'react-i18next';
-import SafeTrans from '@/components/SafeTrans';
 import { Link } from 'react-router-dom';
 import useSWR from 'swr';
 import { useShallow } from 'zustand/shallow';
@@ -435,6 +435,41 @@ export default function UploadOptionsButton({ folder, numFiles }: { folder?: str
               )
             }
           />
+
+          <Select
+            label={
+              <>
+                {t('options.discordPreview.label')}{' '}
+                {options.discordPreviewMode !== 'default' ? (
+                  <Badge variant='outline' size='xs'>
+                    {t('options.saved')}
+                  </Badge>
+                ) : null}
+              </>
+            }
+            description={t('options.discordPreview.description')}
+            data={[
+              { value: 'default', label: t('options.discordPreview.default') },
+              { value: 'components', label: t('options.discordPreview.components') },
+              { value: 'none', label: t('options.discordPreview.none') },
+            ]}
+            value={options.discordPreviewMode}
+            onChange={(value) =>
+              setOption(
+                'discordPreviewMode',
+                (value as UploadOptionsStore['options']['discordPreviewMode']) || 'default',
+              )
+            }
+            comboboxProps={{ withinPortal: true }}
+          />
+
+          {options.discordPreviewMode === 'components' ? (
+            <DiscordComponentEmbedBuilder
+              value={options.discordComponentEmbed}
+              showEnabledToggle={false}
+              onChange={(value) => setOption('discordComponentEmbed', { ...value, enabled: true })}
+            />
+          ) : null}
 
           <Text c='dimmed' size='sm'>
             <b>{t('options.other')}</b>

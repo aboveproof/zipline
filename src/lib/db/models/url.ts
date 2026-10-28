@@ -1,11 +1,16 @@
 import { db, type DbClient } from '@/lib/db';
 import { urls } from '@/lib/db/schema';
+import { discordComponentEmbedSchema, discordUrlPreviewModeSchema } from '@/lib/discord';
 import { createId } from '@paralleldrive/cuid2';
 import { and, inArray, ne, or, sql } from 'drizzle-orm';
 import { createSelectSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 
-export const urlSchema = createSelectSchema(urls, { password: z.boolean() }).extend({
+export const urlSchema = createSelectSchema(urls, {
+  password: z.boolean(),
+  discordPreviewMode: discordUrlPreviewModeSchema,
+  discordComponentEmbed: discordComponentEmbedSchema.nullable(),
+}).extend({
   similarity: z.number().optional(),
 });
 

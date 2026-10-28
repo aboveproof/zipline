@@ -1,3 +1,8 @@
+import {
+  validateDiscordUrlPreview,
+  discordComponentEmbedSchema,
+  discordUrlPreviewModeSchema,
+} from '@/lib/discord';
 import { ApiError } from '@/lib/api/errors';
 import { config } from '@/lib/config';
 import { hashPassword } from '@/lib/crypto';
@@ -55,6 +60,8 @@ export default typedPlugin(
               .nullish(),
             destination: z.httpUrl().min(1),
             enabled: z.boolean().optional(),
+            discordPreviewMode: discordUrlPreviewModeSchema.optional(),
+            discordComponentEmbed: discordComponentEmbedSchema.nullish(),
           }),
           headers: z.object({
             'x-zipline-max-views': z.coerce.number().min(1).optional(),
@@ -77,7 +84,9 @@ export default typedPlugin(
         preHandler: [userMiddleware, rateLimit],
       },
       async (req, res) => {
-        const { vanity, destination, enabled } = req.body;
+        const { vanity, destination, enabled, discordPreviewMode, discordComponentEmbed } = req.body;
+        validateDiscordUrlPreview(req.body, req.user);
+
         const noJson = req.headers['x-zipline-no-json'];
 
         let returnDomain;
@@ -117,6 +126,8 @@ export default typedPlugin(
               maxViews,
               password,
               enabled,
+              discordPreviewMode,
+              discordComponentEmbed,
             })
             .returning(urlColumns);
           if (!created) throw new ApiError(9005);

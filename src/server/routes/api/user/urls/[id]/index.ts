@@ -1,3 +1,8 @@
+import {
+  validateDiscordUrlPreview,
+  discordComponentEmbedSchema,
+  discordUrlPreviewModeSchema,
+} from '@/lib/discord';
 import { ApiError } from '@/lib/api/errors';
 import { hashPassword } from '@/lib/crypto';
 import { db } from '@/lib/db';
@@ -59,6 +64,8 @@ export default typedPlugin(
             maxViews: z.number().min(0).nullish(),
             destination: z.httpUrl().optional(),
             enabled: z.boolean().optional(),
+            discordPreviewMode: discordUrlPreviewModeSchema.optional(),
+            discordComponentEmbed: discordComponentEmbedSchema.nullish(),
           }),
           response: {
             200: urlSchema.omit({ password: true }),
@@ -77,6 +84,8 @@ export default typedPlugin(
 
         if (!url) throw new ApiError(9002);
 
+        validateDiscordUrlPreview({ ...url, ...req.body }, req.user);
+
         let password: string | null | undefined = undefined;
         if (req.body.password !== undefined) {
           if (req.body.password === null || req.body.password === '') {
@@ -94,6 +103,12 @@ export default typedPlugin(
           ...(req.body.maxViews !== undefined && { maxViews: req.body.maxViews }),
           ...(req.body.destination !== undefined && { destination: req.body.destination }),
           ...(req.body.enabled !== undefined && { enabled: req.body.enabled }),
+          ...(req.body.discordPreviewMode !== undefined && {
+            discordPreviewMode: req.body.discordPreviewMode,
+          }),
+          ...(req.body.discordComponentEmbed !== undefined && {
+            discordComponentEmbed: req.body.discordComponentEmbed,
+          }),
         };
 
         let updatedUrl = url;

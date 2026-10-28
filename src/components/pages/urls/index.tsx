@@ -1,8 +1,14 @@
+import DiscordComponentEmbedBuilder from '@/components/DiscordComponentEmbedBuilder';
 import DomainSelect from '@/components/DomainSelect';
 import GridTableSwitcher from '@/components/GridTableSwitcher';
 import { Response } from '@/lib/api/response';
 import { useViewStore } from '@/lib/client/store/view';
 import { Url } from '@/lib/db/models/url';
+import {
+  defaultDiscordUrlComponentEmbed,
+  type DiscordComponentEmbed,
+  type DiscordUrlPreviewMode,
+} from '@/lib/discord';
 import { fetchApi } from '@/lib/fetchApi';
 import {
   ActionIcon,
@@ -12,6 +18,7 @@ import {
   Modal,
   NumberInput,
   PasswordInput,
+  Select,
   Stack,
   Switch,
   Text,
@@ -54,6 +61,8 @@ export default function DashboardURLs() {
     password: string;
     enabled: boolean;
     domain: '' | string;
+    discordPreviewMode: DiscordUrlPreviewMode;
+    discordComponentEmbed: DiscordComponentEmbed;
   }>({
     initialValues: {
       url: '',
@@ -62,6 +71,8 @@ export default function DashboardURLs() {
       password: '',
       enabled: true,
       domain: '',
+      discordPreviewMode: 'destination',
+      discordComponentEmbed: defaultDiscordUrlComponentEmbed(),
     },
     validate: {
       url: (value) => (value.length < 1 ? t('create.url.required') : null),
@@ -85,6 +96,9 @@ export default function DashboardURLs() {
         destination: values.url,
         vanity: values.vanity.trim() || null,
         enabled: values.enabled ?? true,
+        discordPreviewMode: values.discordPreviewMode,
+        discordComponentEmbed:
+          values.discordPreviewMode === 'components' ? values.discordComponentEmbed : null,
       },
       {
         ...(values.maxViews !== '' && { 'x-zipline-max-views': String(values.maxViews) }),
@@ -107,7 +121,7 @@ export default function DashboardURLs() {
       const copy = () => {
         if (!values.enabled) return;
 
-        clipboard.copy(data?.url);
+        clipboard.copy(values.discordPreviewMode === 'none' ? `<${data?.url}>` : data?.url);
         notifications.show({
           title: t('notifications.copied.title'),
           message: (
@@ -191,6 +205,30 @@ export default function DashboardURLs() {
               description={t('create.enabled.description')}
               {...form.getInputProps('enabled', { type: 'checkbox' })}
             />
+
+            <Select
+              label={t('create.discordPreview.label')}
+              description={t('create.discordPreview.description')}
+              data={[
+                { value: 'destination', label: t('create.discordPreview.options.destination') },
+                { value: 'components', label: t('create.discordPreview.options.components') },
+                { value: 'none', label: t('create.discordPreview.options.none') },
+              ]}
+              value={form.values.discordPreviewMode}
+              onChange={(value) =>
+                form.setFieldValue('discordPreviewMode', (value as DiscordUrlPreviewMode) ?? 'destination')
+              }
+              allowDeselect={false}
+            />
+
+            {form.values.discordPreviewMode === 'components' ? (
+              <DiscordComponentEmbedBuilder
+                value={form.values.discordComponentEmbed}
+                context='url'
+                showEnabledToggle={false}
+                onChange={(value) => form.setFieldValue('discordComponentEmbed', value)}
+              />
+            ) : null}
 
             <PasswordInput
               label={t('create.password.label')}

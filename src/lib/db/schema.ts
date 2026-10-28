@@ -1,8 +1,9 @@
+import type { DiscordComponentEmbed, DiscordFilePreviewMode, DiscordUrlPreviewMode } from '@/lib/discord';
+import type { QuickLinkId } from '@/lib/quickLinks';
 import { createId } from '@paralleldrive/cuid2';
 import type { Json } from 'drizzle-orm';
-import type { QuickLinkId } from '@/lib/quickLinks';
-import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   index,
@@ -261,6 +262,8 @@ export const files = pgTable(
     favorite: boolean().default(false).notNull(),
     password: text(),
     anonymous: boolean().default(false).notNull(),
+    discordPreviewMode: text().$type<DiscordFilePreviewMode>(),
+    discordComponentEmbed: jsonb().$type<DiscordComponentEmbed>(),
     userId: text().references(() => users.id, {
       name: 'file_user_id_fkey',
       onDelete: 'set null',
@@ -476,6 +479,8 @@ export const urls = pgTable(
     maxViews: integer(),
     password: text(),
     enabled: boolean().default(true).notNull(),
+    discordPreviewMode: text().$type<DiscordUrlPreviewMode>().default('destination').notNull(),
+    discordComponentEmbed: jsonb().$type<DiscordComponentEmbed>(),
     userId: text().references(() => users.id, {
       name: 'url_user_id_fkey',
       onDelete: 'set null',
