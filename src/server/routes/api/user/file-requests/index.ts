@@ -25,6 +25,7 @@ export const fileRequestInputSchema = z.object({
   expiresAt: z.coerce.date().nullish(),
   maxFiles: z.number().int().min(1).max(1000).nullish(),
   maxBytes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).nullish(),
+  closeAtBytes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).nullish(),
   allowedTypes: z
     .array(z.string().max(120))
     .max(50)
@@ -75,6 +76,8 @@ export default typedPlugin(
       async (req, res) => {
         if (req.body.expiresAt && req.body.expiresAt <= new Date())
           throw new ApiError(1000, 'Expiration must be in the future.');
+        if (req.body.maxBytes && req.body.closeAtBytes && req.body.closeAtBytes > req.body.maxBytes)
+          throw new ApiError(1000, 'The storage closing size cannot exceed the storage limit.');
 
         if (req.body.folderId) {
           const folder = await getFolderMetadata(req.body.folderId);
@@ -92,6 +95,7 @@ export default typedPlugin(
             expiresAt: req.body.expiresAt,
             maxFiles: req.body.maxFiles,
             maxBytes: req.body.maxBytes,
+            closeAtBytes: req.body.closeAtBytes,
             allowedTypes: normalizeAllowedTypes(req.body.allowedTypes ?? []),
             folderId: req.body.folderId,
           })

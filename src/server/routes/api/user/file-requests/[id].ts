@@ -30,6 +30,18 @@ export default typedPlugin(
         preHandler: [userMiddleware],
       },
       async (req, res) => {
+        const current = await db.query.fileRequests.findFirst({
+          columns: { maxBytes: true, closeAtBytes: true },
+          where: { id: req.params.id, userId: req.user.id },
+        });
+        if (!current) throw new ApiError(4012);
+
+        const maxBytes = req.body.maxBytes === undefined ? current.maxBytes : req.body.maxBytes;
+        const closeAtBytes =
+          req.body.closeAtBytes === undefined ? current.closeAtBytes : req.body.closeAtBytes;
+        if (maxBytes && closeAtBytes && closeAtBytes > maxBytes)
+          throw new ApiError(1000, 'The storage closing size cannot exceed the storage limit.');
+
         if (req.body.folderId) {
           const folder = await getFolderMetadata(req.body.folderId);
           if (!folder || folder.userId !== req.user.id) throw new ApiError(4001);
@@ -42,6 +54,7 @@ export default typedPlugin(
         if (req.body.expiresAt !== undefined) update.expiresAt = req.body.expiresAt;
         if (req.body.maxFiles !== undefined) update.maxFiles = req.body.maxFiles;
         if (req.body.maxBytes !== undefined) update.maxBytes = req.body.maxBytes;
+        if (req.body.closeAtBytes !== undefined) update.closeAtBytes = req.body.closeAtBytes;
         if (req.body.folderId !== undefined) update.folderId = req.body.folderId;
         if (req.body.allowedTypes !== undefined)
           update.allowedTypes = normalizeAllowedTypes(req.body.allowedTypes);

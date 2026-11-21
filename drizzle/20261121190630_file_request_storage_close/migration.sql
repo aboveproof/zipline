@@ -1,0 +1,1 @@
+ALTER TABLE "FileRequest" ADD COLUMN "closeAtBytes" bigint;

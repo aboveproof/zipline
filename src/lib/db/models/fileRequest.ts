@@ -26,6 +26,7 @@ export const publicFileRequestSchema = fileRequestSchema
     expiresAt: true,
     maxFiles: true,
     maxBytes: true,
+    closeAtBytes: true,
     allowedTypes: true,
     passwordProtected: true,
     receivedFiles: true,
@@ -35,6 +36,21 @@ export const publicFileRequestSchema = fileRequestSchema
 
 export type FileRequest = z.infer<typeof fileRequestSchema>;
 export type PublicFileRequest = z.infer<typeof publicFileRequestSchema>;
+
+export function fileRequestIsOpen(
+  request: Pick<
+    FileRequest,
+    'enabled' | 'expiresAt' | 'maxFiles' | 'maxBytes' | 'closeAtBytes' | 'receivedFiles' | 'receivedBytes'
+  >,
+  now = new Date(),
+) {
+  return (
+    request.enabled &&
+    (!request.expiresAt || request.expiresAt > now) &&
+    (request.maxFiles === null || request.receivedFiles < request.maxFiles) &&
+    (request.closeAtBytes === null || request.receivedBytes < request.closeAtBytes)
+  );
+}
 
 const { password: _password, userId: _userId, ...fileRequestColumns } = getColumns(fileRequests);
 
@@ -118,6 +134,7 @@ export async function validateFileRequestUpload(
 
   if (request.maxFiles !== null && nextFiles > request.maxFiles) throw new ApiError(1074);
   if (request.maxBytes !== null && nextBytes > request.maxBytes) throw new ApiError(1074);
+  if (request.closeAtBytes !== null && nextBytes > request.closeAtBytes) throw new ApiError(1074);
 
   return request;
 }

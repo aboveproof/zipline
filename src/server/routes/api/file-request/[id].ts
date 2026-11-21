@@ -3,6 +3,7 @@ import { ApiError } from '@/lib/api/errors';
 import { verifyPassword } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import {
+  fileRequestIsOpen,
   listFileRequests,
   publicFileRequestSchema,
   type PublicFileRequest,
@@ -37,10 +38,7 @@ export default typedPlugin(
         const [request] = await listFileRequests(row.userId, req.params.id);
         if (!request) throw new ApiError(4012);
 
-        const full =
-          (request.maxFiles !== null && request.receivedFiles >= request.maxFiles) ||
-          (request.maxBytes !== null && request.receivedBytes >= request.maxBytes);
-        const open = request.enabled && !full && (!request.expiresAt || request.expiresAt > new Date());
+        const open = fileRequestIsOpen(request);
         const { enabled: _enabled, folderId: _folderId, folderName: _folderName, ...publicRequest } = request;
         return res.send({ ...publicRequest, open });
       },

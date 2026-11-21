@@ -230,6 +230,7 @@ export const fileRequests = pgTable(
     expiresAt: timestamp({ precision: 3, mode: 'date', withTimezone: true }),
     maxFiles: integer(),
     maxBytes: bigint({ mode: 'number' }),
+    closeAtBytes: bigint({ mode: 'number' }),
     allowedTypes: text().array().default([]).notNull(),
     folderId: text().references(() => folders.id, {
       name: 'file_request_folder_id_fkey',

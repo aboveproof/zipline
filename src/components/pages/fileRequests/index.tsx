@@ -56,9 +56,12 @@ type FormValues = {
   expiresAt: Date | null;
   maxFilesEnabled: boolean;
   maxFiles: number | string;
-  maxSizeEnabled: boolean;
-  maxSize: number | string;
-  maxSizeUnit: SizeUnit;
+  storageLimitEnabled: boolean;
+  storageLimit: number | string;
+  storageLimitUnit: SizeUnit;
+  closeSizeEnabled: boolean;
+  closeSize: number | string;
+  closeSizeUnit: SizeUnit;
   allowedTypes: string[];
   folderId: string | null;
 };
@@ -91,9 +94,12 @@ const initialValues: FormValues = {
   expiresAt: null,
   maxFilesEnabled: false,
   maxFiles: '',
-  maxSizeEnabled: false,
-  maxSize: '',
-  maxSizeUnit: 'MB',
+  storageLimitEnabled: false,
+  storageLimit: '',
+  storageLimitUnit: 'GB',
+  closeSizeEnabled: false,
+  closeSize: '',
+  closeSizeUnit: 'GB',
   allowedTypes: [],
   folderId: null,
 };
@@ -111,7 +117,21 @@ export default function DashboardFileRequests() {
     validate: {
       name: (value) => (value.trim() ? null : t('form.nameRequired')),
       maxFiles: (value, values) => (values.maxFilesEnabled && value === '' ? t('form.limitRequired') : null),
-      maxSize: (value, values) => (values.maxSizeEnabled && value === '' ? t('form.limitRequired') : null),
+      storageLimit: (value, values) =>
+        values.storageLimitEnabled && value === '' ? t('form.limitRequired') : null,
+      closeSize: (value, values) => {
+        if (values.closeSizeEnabled && value === '') return t('form.limitRequired');
+        if (
+          values.closeSizeEnabled &&
+          values.storageLimitEnabled &&
+          value !== '' &&
+          values.storageLimit !== '' &&
+          Number(value) * sizeUnits[values.closeSizeUnit] >
+            Number(values.storageLimit) * sizeUnits[values.storageLimitUnit]
+        )
+          return t('form.closeSizeAboveLimit');
+        return null;
+      },
       expiresAt: (value, values) =>
         values.expiresEnabled && value === null ? t('form.expirationRequired') : null,
     },
@@ -125,7 +145,8 @@ export default function DashboardFileRequests() {
   };
 
   const openEdit = (request: FileRequest) => {
-    const maxSize = editableSize(request.maxBytes);
+    const storageLimit = editableSize(request.maxBytes);
+    const closeSize = editableSize(request.closeAtBytes);
     setEditing(request);
     form.setValues({
       name: request.name,
@@ -137,9 +158,12 @@ export default function DashboardFileRequests() {
       expiresAt: request.expiresAt ? new Date(request.expiresAt) : null,
       maxFilesEnabled: request.maxFiles !== null,
       maxFiles: request.maxFiles ?? '',
-      maxSizeEnabled: request.maxBytes !== null,
-      maxSize: maxSize.amount,
-      maxSizeUnit: maxSize.unit,
+      storageLimitEnabled: request.maxBytes !== null,
+      storageLimit: storageLimit.amount,
+      storageLimitUnit: storageLimit.unit,
+      closeSizeEnabled: request.closeAtBytes !== null,
+      closeSize: closeSize.amount,
+      closeSizeUnit: closeSize.unit,
       allowedTypes: request.allowedTypes,
       folderId: request.folderId,
     });
@@ -155,8 +179,12 @@ export default function DashboardFileRequests() {
       expiresAt: values.expiresEnabled ? (values.expiresAt?.toISOString() ?? null) : null,
       maxFiles: values.maxFilesEnabled && values.maxFiles !== '' ? Number(values.maxFiles) : null,
       maxBytes:
-        values.maxSizeEnabled && values.maxSize !== ''
-          ? Math.round(Number(values.maxSize) * sizeUnits[values.maxSizeUnit])
+        values.storageLimitEnabled && values.storageLimit !== ''
+          ? Math.round(Number(values.storageLimit) * sizeUnits[values.storageLimitUnit])
+          : null,
+      closeAtBytes:
+        values.closeSizeEnabled && values.closeSize !== ''
+          ? Math.round(Number(values.closeSize) * sizeUnits[values.closeSizeUnit])
           : null,
       allowedTypes: values.allowedTypes.map((value) => value.trim()).filter(Boolean),
       folderId: values.folderId || null,
@@ -210,40 +238,32 @@ export default function DashboardFileRequests() {
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? t('form.editTitle') : t('form.createTitle')}
-        size='xl'
+        size='lg'
         centered
       >
         <form onSubmit={submit}>
-          <Stack gap='lg'>
-            <Stack gap='xs'>
-              <div>
-                <Text fw={600}>{t('form.sections.details')}</Text>
-                <Text c='dimmed' size='sm'>
-                  {t('form.sections.detailsHelp')}
-                </Text>
-              </div>
-              <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                <TextInput
-                  label={t('form.name')}
-                  placeholder={t('form.namePlaceholder')}
-                  {...form.getInputProps('name')}
-                />
-                <Select
-                  clearable
-                  searchable
-                  label={t('form.folder')}
-                  placeholder={t('form.rootFolder')}
-                  data={(folders ?? []).map((folder) => ({ value: folder.id, label: folder.name }))}
-                  {...form.getInputProps('folderId')}
-                />
-              </SimpleGrid>
-            </Stack>
+          <Stack gap='md'>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing='sm'>
+              <TextInput
+                label={t('form.name')}
+                placeholder={t('form.namePlaceholder')}
+                {...form.getInputProps('name')}
+              />
+              <Select
+                clearable
+                searchable
+                label={t('form.folder')}
+                placeholder={t('form.rootFolder')}
+                data={(folders ?? []).map((folder) => ({ value: folder.id, label: folder.name }))}
+                {...form.getInputProps('folderId')}
+              />
+            </SimpleGrid>
             <Textarea
               label={t('form.description')}
               description={t('form.descriptionHelp')}
               autosize
-              minRows={2}
-              maxRows={5}
+              minRows={1}
+              maxRows={3}
               {...form.getInputProps('description')}
             />
 
@@ -251,20 +271,45 @@ export default function DashboardFileRequests() {
 
             <Stack gap='xs'>
               <div>
-                <Text fw={600}>{t('form.sections.closing')}</Text>
-                <Text c='dimmed' size='sm'>
-                  {t('form.sections.closingHelp')}
+                <Text fw={600}>{t('form.sections.limits')}</Text>
+                <Text c='dimmed' size='xs'>
+                  {t('form.sections.limitsHelp')}
                 </Text>
               </div>
-              <SimpleGrid cols={{ base: 1, sm: 3 }}>
-                <Paper withBorder p='sm'>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing='md' verticalSpacing='sm'>
+                <Stack gap={6}>
+                  <Switch
+                    label={t('form.storageLimit')}
+                    description={t('form.storageLimitHelp')}
+                    {...form.getInputProps('storageLimitEnabled', { type: 'checkbox' })}
+                  />
+                  <Group gap='xs' align='flex-start' wrap='nowrap'>
+                    <NumberInput
+                      aria-label={t('form.storageLimit')}
+                      placeholder={t('form.sizePlaceholder')}
+                      min={0.01}
+                      decimalScale={2}
+                      disabled={!form.values.storageLimitEnabled}
+                      style={{ flex: 1 }}
+                      {...form.getInputProps('storageLimit')}
+                    />
+                    <Select
+                      aria-label={t('form.sizeUnit')}
+                      data={Object.keys(sizeUnits)}
+                      allowDeselect={false}
+                      disabled={!form.values.storageLimitEnabled}
+                      w={84}
+                      {...form.getInputProps('storageLimitUnit')}
+                    />
+                  </Group>
+                </Stack>
+                <Stack gap={6}>
                   <Switch
                     label={t('form.stopAfterFiles')}
                     description={t('form.stopAfterFilesHelp')}
                     {...form.getInputProps('maxFilesEnabled', { type: 'checkbox' })}
                   />
                   <NumberInput
-                    mt='sm'
                     aria-label={t('form.maxFiles')}
                     placeholder={t('form.fileCountPlaceholder')}
                     min={1}
@@ -273,41 +318,40 @@ export default function DashboardFileRequests() {
                     disabled={!form.values.maxFilesEnabled}
                     {...form.getInputProps('maxFiles')}
                   />
-                </Paper>
-                <Paper withBorder p='sm'>
+                </Stack>
+                <Stack gap={6}>
                   <Switch
                     label={t('form.stopAfterSize')}
                     description={t('form.stopAfterSizeHelp')}
-                    {...form.getInputProps('maxSizeEnabled', { type: 'checkbox' })}
+                    {...form.getInputProps('closeSizeEnabled', { type: 'checkbox' })}
                   />
-                  <Group mt='sm' gap='xs' align='flex-start' wrap='nowrap'>
+                  <Group gap='xs' align='flex-start' wrap='nowrap'>
                     <NumberInput
-                      aria-label={t('form.maxSize')}
+                      aria-label={t('form.closeSize')}
                       placeholder={t('form.sizePlaceholder')}
                       min={0.01}
                       decimalScale={2}
-                      disabled={!form.values.maxSizeEnabled}
+                      disabled={!form.values.closeSizeEnabled}
                       style={{ flex: 1 }}
-                      {...form.getInputProps('maxSize')}
+                      {...form.getInputProps('closeSize')}
                     />
                     <Select
                       aria-label={t('form.sizeUnit')}
                       data={Object.keys(sizeUnits)}
                       allowDeselect={false}
-                      disabled={!form.values.maxSizeEnabled}
-                      w={88}
-                      {...form.getInputProps('maxSizeUnit')}
+                      disabled={!form.values.closeSizeEnabled}
+                      w={84}
+                      {...form.getInputProps('closeSizeUnit')}
                     />
                   </Group>
-                </Paper>
-                <Paper withBorder p='sm'>
+                </Stack>
+                <Stack gap={6}>
                   <Switch
                     label={t('form.stopAtTime')}
                     description={t('form.stopAtTimeHelp')}
                     {...form.getInputProps('expiresEnabled', { type: 'checkbox' })}
                   />
                   <DateTimePicker
-                    mt='sm'
                     clearable
                     minDate={now}
                     aria-label={t('form.expiresAt')}
@@ -315,20 +359,14 @@ export default function DashboardFileRequests() {
                     disabled={!form.values.expiresEnabled}
                     {...form.getInputProps('expiresAt')}
                   />
-                </Paper>
+                </Stack>
               </SimpleGrid>
             </Stack>
 
             <Divider />
 
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing='lg'>
-              <Stack gap='xs'>
-                <div>
-                  <Text fw={600}>{t('form.sections.files')}</Text>
-                  <Text c='dimmed' size='sm'>
-                    {t('form.sections.filesHelp')}
-                  </Text>
-                </div>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing='md'>
+              <Stack gap={6}>
                 <TagsInput
                   label={t('form.allowedTypes')}
                   description={t('form.allowedTypesHelp')}
@@ -338,13 +376,7 @@ export default function DashboardFileRequests() {
                   {...form.getInputProps('allowedTypes')}
                 />
               </Stack>
-              <Stack gap='xs'>
-                <div>
-                  <Text fw={600}>{t('form.sections.access')}</Text>
-                  <Text c='dimmed' size='sm'>
-                    {t('form.sections.accessHelp')}
-                  </Text>
-                </div>
+              <Stack gap={6}>
                 <PasswordInput
                   label={t('form.password')}
                   description={editing ? t('form.passwordEditHelp') : t('form.passwordHelp')}
@@ -360,20 +392,20 @@ export default function DashboardFileRequests() {
               </Stack>
             </SimpleGrid>
 
-            <Paper withBorder p='sm'>
+            <Group justify='space-between' align='flex-end' wrap='wrap'>
               <Switch
                 label={t('form.enabled')}
                 description={t('form.enabledHelp')}
                 {...form.getInputProps('enabled', { type: 'checkbox' })}
               />
-            </Paper>
-            <Group justify='flex-end'>
-              <Button variant='default' onClick={() => setModalOpen(false)}>
-                {t('common:actions.cancel')}
-              </Button>
-              <Button type='submit' loading={form.submitting}>
-                {t(editing ? 'form.save' : 'form.create')}
-              </Button>
+              <Group gap='sm'>
+                <Button variant='default' onClick={() => setModalOpen(false)}>
+                  {t('common:actions.cancel')}
+                </Button>
+                <Button type='submit' loading={form.submitting}>
+                  {t(editing ? 'form.save' : 'form.create')}
+                </Button>
+              </Group>
             </Group>
           </Stack>
         </form>
@@ -404,12 +436,14 @@ export default function DashboardFileRequests() {
             const expired = !!request.expiresAt && new Date(request.expiresAt) <= now;
             const full =
               (request.maxFiles !== null && request.receivedFiles >= request.maxFiles) ||
-              (request.maxBytes !== null && request.receivedBytes >= request.maxBytes);
+              (request.closeAtBytes !== null && request.receivedBytes >= request.closeAtBytes);
             const open = request.enabled && !expired && !full;
             const url = `${window.location.origin}/request/${request.id}`;
             const closingRules = [
               request.maxFiles !== null ? t('card.closesAfterFiles', { count: request.maxFiles }) : null,
-              request.maxBytes !== null ? t('card.closesAfterSize', { size: bytes(request.maxBytes) }) : null,
+              request.closeAtBytes !== null
+                ? t('card.closesAfterSize', { size: bytes(request.closeAtBytes) })
+                : null,
               request.expiresAt
                 ? t('card.closesAt', { date: new Date(request.expiresAt).toLocaleString() })
                 : null,
