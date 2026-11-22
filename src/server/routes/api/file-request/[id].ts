@@ -57,12 +57,12 @@ export default typedPlugin(
       },
       async (req, res) => {
         const request = await db.query.fileRequests.findFirst({
-          columns: { id: true, enabled: true, expiresAt: true, password: true },
+          columns: { id: true, userId: true, enabled: true, expiresAt: true, password: true },
           where: { id: req.params.id },
         });
         if (!request) throw new ApiError(4012);
-        if (!request.enabled || (request.expiresAt && request.expiresAt <= new Date()))
-          throw new ApiError(1073);
+        const [summary] = await listFileRequests(request.userId, request.id);
+        if (!summary || !fileRequestIsOpen(summary)) throw new ApiError(1073);
         if (!request.password || !(await verifyPassword(req.body.password, request.password)))
           throw new ApiError(3005);
 

@@ -48,3 +48,52 @@ test('storage closing thresholds close file requests', () => {
     false,
   );
 });
+
+test('file count, expiration, and disabled flag close file requests', () => {
+  const now = new Date('2026-11-21T12:00:00Z');
+  assert.equal(
+    fileRequestIsOpen(
+      {
+        enabled: true,
+        expiresAt: null,
+        maxFiles: 5,
+        maxBytes: null,
+        closeAtBytes: null,
+        receivedFiles: 5,
+        receivedBytes: 0,
+      },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    fileRequestIsOpen(
+      {
+        enabled: true,
+        expiresAt: new Date('2026-11-21T11:59:59Z'),
+        maxFiles: null,
+        maxBytes: null,
+        closeAtBytes: null,
+        receivedFiles: 0,
+        receivedBytes: 0,
+      },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    fileRequestIsOpen(
+      {
+        enabled: false,
+        expiresAt: null,
+        maxFiles: null,
+        maxBytes: null,
+        closeAtBytes: null,
+        receivedFiles: 0,
+        receivedBytes: 0,
+      },
+      now,
+    ),
+    false,
+  );
+});

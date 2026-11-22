@@ -24,7 +24,11 @@ import { hashPassword } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import { lockFiles, type FileInsert } from '@/lib/db/models/file';
 import { getFolderMetadata } from '@/lib/db/models/folder';
-import { getFileRequestUploadContext, validateFileRequestUpload } from '@/lib/db/models/fileRequest';
+import {
+  getFileRequestUploadContext,
+  preflightFileRequestUpload,
+  validateFileRequestUpload,
+} from '@/lib/db/models/fileRequest';
 import { getUser } from '@/lib/db/models/user';
 import { files, incompleteFiles, users } from '@/lib/db/schema';
 import { sanitizeFilename } from '@/lib/fs';
@@ -126,6 +130,12 @@ export default typedPlugin(
         if (!quotaUser && folder?.userId) quotaUser = await getUser(folder.userId);
 
         if (start === 0) {
+          if (fileRequest) {
+            await preflightFileRequestUpload(fileRequest.id, [
+              { size: total, type: options.partial.contentType, filename: options.partial.filename },
+            ]);
+          }
+
           createPartial(req, fileRequest?.folderId ?? options.folder, quotaUser?.id ?? null, total);
 
           if (quotaUser?.id) {

@@ -21,8 +21,8 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconFileArrowRight, IconLock } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { IconClock, IconFileArrowRight, IconLock } from '@tabler/icons-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { data, Params, useLoaderData } from 'react-router-dom';
 
@@ -44,9 +44,24 @@ export async function loader({ params }: { params: Params<string> }) {
 
 export function Component() {
   const { t } = useTranslation('fileRequests');
-  const { request, config } = useLoaderData<typeof loader>();
+  const { request: initialRequest, config } = useLoaderData<typeof loader>();
+  const [request, setRequest] = useState<PublicRequest>(initialRequest);
   const [token, setToken] = useState<string>();
-  const uploadRequest = useMemo(() => ({ id: request.id, token }), [request.id, token]);
+
+  useEffect(() => {
+    setRequest(initialRequest);
+    setToken(undefined);
+  }, [initialRequest]);
+
+  const refreshRequest = useCallback(async () => {
+    const { data: refreshed } = await fetchApi<PublicRequest>(`/api/file-request/${request.id}`);
+    if (refreshed) setRequest(refreshed);
+  }, [request.id]);
+
+  const uploadRequest = useMemo(
+    () => ({ id: request.id, token, allowedTypes: request.allowedTypes }),
+    [request.id, request.allowedTypes, token],
+  );
   useTitle(t('public.pageTitle', { name: request.name }));
 
   const passwordForm = useForm({
@@ -83,6 +98,14 @@ export function Component() {
               {request.description}
             </Text>
           )}
+          {request.expiresAt && (
+            <Group gap={6} mt={6}>
+              <IconClock size='0.9rem' />
+              <Text c='dimmed' size='xs'>
+                {t('public.closesAt', { date: new Date(request.expiresAt).toLocaleString() })}
+              </Text>
+            </Group>
+          )}
         </div>
 
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing='sm'>
@@ -101,7 +124,9 @@ export function Component() {
             </Text>
             <Text fw={700}>
               {bytes(request.receivedBytes)}
-              {request.maxBytes ? ` / ${bytes(request.maxBytes)}` : ''}
+              {request.maxBytes || request.closeAtBytes
+                ? ` / ${bytes((request.maxBytes ?? request.closeAtBytes)!)}`
+                : ''}
             </Text>
           </Paper>
           <Paper withBorder p='sm'>
@@ -151,7 +176,7 @@ export function Component() {
         ) : (
           <Paper withBorder p={{ base: 'sm', sm: 'md' }}>
             <ConfigProvider data={{ config: config as unknown as SafeConfig, codeMap: [] }}>
-              <FileUploadProvider fileRequest={uploadRequest}>
+              <FileUploadProvider fileRequest={uploadRequest} onUploadComplete={refreshRequest}>
                 <UploadFile title={t('public.uploadTitle')} fileRequest />
               </FileUploadProvider>
             </ConfigProvider>

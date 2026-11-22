@@ -42,6 +42,7 @@ import {
   IconClock,
   IconDatabase,
   IconEdit,
+  IconExternalLink,
   IconFileArrowRight,
   IconFiles,
   IconFilter,
@@ -575,6 +576,18 @@ export default function DashboardFileRequests() {
                     )}
                   </div>
                   <Group gap={4} wrap='nowrap'>
+                    <Tooltip label={t('openLink')}>
+                      <ActionIcon
+                        component='a'
+                        href={url}
+                        target='_blank'
+                        rel='noreferrer'
+                        variant='subtle'
+                        aria-label={t('openLink')}
+                      >
+                        <IconExternalLink size='1rem' />
+                      </ActionIcon>
+                    </Tooltip>
                     <CopyButton value={url}>
                       {({ copied, copy }) => (
                         <Tooltip label={t(copied ? 'copied' : 'copy')}>
@@ -618,7 +631,9 @@ export default function DashboardFileRequests() {
                     </Text>
                     <Text fw={600}>
                       {bytes(request.receivedBytes)}
-                      {request.maxBytes ? ` / ${bytes(request.maxBytes)}` : ''}
+                      {request.maxBytes || request.closeAtBytes
+                        ? ` / ${bytes((request.maxBytes ?? request.closeAtBytes)!)}`
+                        : ''}
                     </Text>
                   </div>
                   <div>

@@ -6,6 +6,7 @@ import {
 } from '@/lib/client/store/uploadOptions';
 import { uploadFileBatch } from '@/lib/client/upload/files';
 import { initialState, useProgress, type UploadProgress } from '@/lib/client/upload/useProgress';
+import { fileRequestAccepts } from '@/lib/fileRequestTypes';
 import { useClipboard } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -32,14 +33,16 @@ export default function FileUploadProvider({
   children,
   folder,
   fileRequest,
+  onUploadComplete,
 }: {
   children: React.ReactNode;
   folder?: string;
-  fileRequest?: { id: string; token?: string };
+  fileRequest?: { id: string; token?: string; allowedTypes?: string[] };
+  onUploadComplete?: () => void;
 }) {
   const config = useConfig();
   const clipboard = useClipboard();
-  const { t } = useTranslation('upload');
+  const { t } = useTranslation(['upload', 'fileRequests']);
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useProgress();
   const [pendingUploads, setPendingUploads] = useState(0);
@@ -48,6 +51,22 @@ export default function FileUploadProvider({
   const upload = useCallback(
     (batch: File[]) => {
       if (batch.length === 0) return Promise.resolve();
+
+      if (fileRequest?.allowedTypes?.length) {
+        const rejected = batch.filter(
+          (file) => !fileRequestAccepts(file.type, file.name, fileRequest.allowedTypes!),
+        );
+        if (rejected.length > 0) {
+          showNotification({
+            title: t('notifications.error.title'),
+            message: t('fileRequests:public.typeNotAllowed', {
+              files: rejected.map((file) => file.name).join(', '),
+            }),
+            color: 'red',
+          });
+          return Promise.resolve();
+        }
+      }
 
       const stored = useUploadOptionsStore.getState();
       const options = fileRequest ? { ...defaultUploadOptions, addOriginalName: true } : stored.options;
@@ -79,13 +98,14 @@ export default function FileUploadProvider({
         } finally {
           setProgress(initialState);
           setPendingUploads((count) => count - 1);
+          onUploadComplete?.();
         }
       });
 
       queue.current = next;
       return next;
     },
-    [config, clipboard, fileRequest, folder, setProgress, t],
+    [config, clipboard, fileRequest, folder, onUploadComplete, setProgress, t],
   );
 
   useEffect(() => {

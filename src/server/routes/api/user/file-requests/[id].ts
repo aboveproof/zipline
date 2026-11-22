@@ -31,10 +31,17 @@ export default typedPlugin(
       },
       async (req, res) => {
         const current = await db.query.fileRequests.findFirst({
-          columns: { maxBytes: true, closeAtBytes: true },
+          columns: { maxBytes: true, closeAtBytes: true, expiresAt: true },
           where: { id: req.params.id, userId: req.user.id },
         });
         if (!current) throw new ApiError(4012);
+
+        if (
+          req.body.expiresAt &&
+          req.body.expiresAt.getTime() !== current.expiresAt?.getTime() &&
+          req.body.expiresAt <= new Date()
+        )
+          throw new ApiError(1000, 'Expiration must be in the future.');
 
         const maxBytes = req.body.maxBytes === undefined ? current.maxBytes : req.body.maxBytes;
         const closeAtBytes =
@@ -61,14 +68,16 @@ export default typedPlugin(
         if (req.body.password !== undefined)
           update.password = req.body.password ? await hashPassword(req.body.password) : null;
 
-        const [updated] = await db
-          .update(fileRequests)
-          .set(update)
-          .where(and(eq(fileRequests.id, req.params.id), eq(fileRequests.userId, req.user.id)))
-          .returning({ id: fileRequests.id });
-        if (!updated) throw new ApiError(4012);
+        if (Object.keys(update).length > 0) {
+          const [updated] = await db
+            .update(fileRequests)
+            .set(update)
+            .where(and(eq(fileRequests.id, req.params.id), eq(fileRequests.userId, req.user.id)))
+            .returning({ id: fileRequests.id });
+          if (!updated) throw new ApiError(4012);
+        }
 
-        const [request] = await listFileRequests(req.user.id, updated.id);
+        const [request] = await listFileRequests(req.user.id, req.params.id);
         if (!request) throw new ApiError(4012);
 
         logger.info('file request updated', { user: req.user.id, fileRequest: request.id });
