@@ -1,0 +1,1 @@
+ALTER TABLE "FileRequest" ADD COLUMN "showReceivedFiles" boolean DEFAULT false NOT NULL;

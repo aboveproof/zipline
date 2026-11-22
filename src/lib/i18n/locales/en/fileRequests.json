@@ -80,6 +80,8 @@
     "passwordHelp": "Optional. Uploaders must enter this before sending files.",
     "passwordEditHelp": "Leave blank to keep the current password.",
     "removePassword": "Remove the current password",
+    "showReceivedFiles": "Show received files",
+    "showReceivedFilesHelp": "List files uploaded to this request on the public page.",
     "enabled": "Accept uploads",
     "enabledHelp": "Turn off to stop uploads without deleting the request.",
     "create": "Create request",
@@ -120,6 +122,9 @@
     "passwordRequired": "Enter the request password",
     "passwordInvalid": "That password is incorrect",
     "unlock": "Continue",
-    "privacy": "This page accepts uploads only. It does not show any stored files or folders."
+    "receivedFilesTitle": "Received files",
+    "noReceivedFiles": "No files have been uploaded yet.",
+    "privacy": "This page accepts uploads only. It does not show any stored files or folders.",
+    "privacyWithList": "This page only shows files uploaded to this request."
   }
 }

@@ -8,10 +8,12 @@ import { SafeConfig } from '@/lib/config/safe';
 import { fetchApi } from '@/lib/fetchApi';
 import {
   Alert,
+  Anchor,
   Badge,
   Button,
   Center,
   Container,
+  Divider,
   Group,
   Paper,
   PasswordInput,
@@ -21,7 +23,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconClock, IconFileArrowRight, IconLock } from '@tabler/icons-react';
+import { IconClock, IconExternalLink, IconFileArrowRight, IconLock } from '@tabler/icons-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { data, Params, useLoaderData } from 'react-router-dom';
@@ -52,12 +54,19 @@ export function Component() {
   const request = refreshedState?.id === initialRequest.id ? refreshedState.request : initialRequest;
   const token = tokenState?.id === initialRequest.id ? tokenState.token : undefined;
 
-  const refreshRequest = useCallback(async () => {
-    const { data: refreshed } = await fetchApi<PublicRequest>(
-      `/api/file-request/${request.id}?route=${encodeURIComponent(request.route)}`,
-    );
-    if (refreshed) setRefreshedState({ id: request.id, request: refreshed });
-  }, [request.id, request.route]);
+  const refreshRequest = useCallback(
+    async (accessToken?: string) => {
+      const activeToken = accessToken ?? token;
+      const { data: refreshed } = await fetchApi<PublicRequest>(
+        `/api/file-request/${request.id}?route=${encodeURIComponent(request.route)}`,
+        'GET',
+        undefined,
+        activeToken ? { 'x-zipline-file-request-token': activeToken } : undefined,
+      );
+      if (refreshed) setRefreshedState({ id: request.id, request: refreshed });
+    },
+    [request.id, request.route, token],
+  );
 
   const uploadRequest = useMemo(
     () => ({ id: request.id, token, allowedTypes: request.allowedTypes }),
@@ -72,7 +81,7 @@ export function Component() {
 
   const unlock = passwordForm.onSubmit(async ({ password }) => {
     const { data: result, error } = await fetchApi<{ token: string }>(
-      `/api/file-request/${request.id}`,
+      `/api/file-request/${request.id}?route=${encodeURIComponent(request.route)}`,
       'POST',
       { password },
     );
@@ -82,6 +91,7 @@ export function Component() {
     }
     setTokenState({ id: request.id, token: result.token });
     passwordForm.reset();
+    if (request.showReceivedFiles) void refreshRequest(result.token);
   });
 
   const unlocked = !request.passwordProtected || !!token;
@@ -184,8 +194,55 @@ export function Component() {
           </Paper>
         )}
 
+        {request.showReceivedFiles && unlocked && (
+          <Paper withBorder p={{ base: 'sm', sm: 'md' }}>
+            <Group justify='space-between' mb='xs'>
+              <Text fw={700}>{t('public.receivedFilesTitle')}</Text>
+              <Badge variant='light' color='gray'>
+                {request.files?.length ?? request.receivedFiles}
+              </Badge>
+            </Group>
+            {request.files?.length ? (
+              <Stack gap={0}>
+                {request.files.map((file, index) => (
+                  <div key={file.id}>
+                    {index > 0 && <Divider my='xs' />}
+                    <Group justify='space-between' wrap='nowrap' gap='sm'>
+                      <div style={{ minWidth: 0 }}>
+                        <Anchor
+                          href={file.url}
+                          target='_blank'
+                          rel='noreferrer'
+                          fw={500}
+                          size='sm'
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%' }}
+                        >
+                          <Text span truncate>
+                            {file.originalName ?? file.name}
+                          </Text>
+                          <IconExternalLink size='0.85rem' style={{ flex: '0 0 auto' }} />
+                        </Anchor>
+                        <Text c='dimmed' size='xs'>
+                          {new Date(file.createdAt).toLocaleString()}
+                        </Text>
+                      </div>
+                      <Text c='dimmed' size='xs' style={{ flex: '0 0 auto' }}>
+                        {bytes(file.size)}
+                      </Text>
+                    </Group>
+                  </div>
+                ))}
+              </Stack>
+            ) : (
+              <Text c='dimmed' size='sm'>
+                {t('public.noReceivedFiles')}
+              </Text>
+            )}
+          </Paper>
+        )}
+
         <Text c='dimmed' size='xs' ta='center'>
-          {t('public.privacy')}
+          {t(request.showReceivedFiles ? 'public.privacyWithList' : 'public.privacy')}
         </Text>
       </Stack>
     </Container>

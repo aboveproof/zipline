@@ -1,6 +1,8 @@
-import { createAccessToken } from '@/lib/accessToken';
+import { createAccessToken, verifyAccessToken } from '@/lib/accessToken';
 import { ApiError } from '@/lib/api/errors';
+import { config } from '@/lib/config';
 import { verifyPassword } from '@/lib/crypto';
+import { db } from '@/lib/db';
 import {
   fileRequestIsOpen,
   findFileRequestBySlug,
@@ -8,9 +10,12 @@ import {
   publicFileRequestSchema,
   type PublicFileRequest,
 } from '@/lib/db/models/fileRequest';
+import { files } from '@/lib/db/schema';
 import { normalizeFileRequestRoute } from '@/lib/fileRequestTypes';
 import { secondlyRatelimit } from '@/lib/ratelimits';
+import { formatRootUrl } from '@/lib/url';
 import typedPlugin from '@/server/typedPlugin';
+import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 export type ApiFileRequestResponse = (PublicFileRequest & { open: boolean }) | { token: string };
@@ -40,8 +45,38 @@ export default typedPlugin(
         if (!request) throw new ApiError(4012);
 
         const open = fileRequestIsOpen(request);
+        const tokenHeader = req.headers['x-zipline-file-request-token'];
+        const accessToken = typeof tokenHeader === 'string' ? tokenHeader : undefined;
+        const canListFiles =
+          request.showReceivedFiles &&
+          (!request.passwordProtected || verifyAccessToken(accessToken, 'fileRequest', request.id));
+
+        const receivedFilesList = canListFiles
+          ? (
+              await db
+                .select({
+                  id: files.id,
+                  name: files.name,
+                  originalName: files.originalName,
+                  size: files.size,
+                  type: files.type,
+                  createdAt: files.createdAt,
+                })
+                .from(files)
+                .where(and(eq(files.fileRequestId, request.id), eq(files.userId, row.userId)))
+                .orderBy(desc(files.createdAt))
+            ).map((file) => ({
+              ...file,
+              url: formatRootUrl(config.files.route, file.name),
+            }))
+          : undefined;
+
         const { enabled: _enabled, folderId: _folderId, folderName: _folderName, ...publicRequest } = request;
-        return res.send({ ...publicRequest, open });
+        return res.send({
+          ...publicRequest,
+          open,
+          ...(receivedFilesList ? { files: receivedFilesList } : {}),
+        });
       },
     );
 

@@ -77,6 +77,7 @@ type FormValues = {
   vanity: string;
   description: string;
   enabled: boolean;
+  showReceivedFiles: boolean;
   password: string;
   removePassword: boolean;
   expiresEnabled: boolean;
@@ -117,6 +118,7 @@ const initialValues: FormValues = {
   vanity: '',
   description: '',
   enabled: true,
+  showReceivedFiles: false,
   password: '',
   removePassword: false,
   expiresEnabled: false,
@@ -204,6 +206,7 @@ export default function DashboardFileRequests() {
       vanity: request.vanity ?? '',
       description: request.description ?? '',
       enabled: request.enabled,
+      showReceivedFiles: request.showReceivedFiles,
       password: '',
       removePassword: false,
       expiresEnabled: request.expiresAt !== null,
@@ -231,6 +234,7 @@ export default function DashboardFileRequests() {
       vanity: values.vanity.trim() || null,
       description: values.description.trim() || null,
       enabled: values.enabled,
+      showReceivedFiles: values.showReceivedFiles,
       expiresAt: values.expiresEnabled ? (values.expiresAt?.toISOString() ?? null) : null,
       maxFiles: values.maxFilesEnabled && values.maxFiles !== '' ? Number(values.maxFiles) : null,
       maxBytes:
@@ -583,6 +587,12 @@ export default function DashboardFileRequests() {
                 {...form.getInputProps('removePassword', { type: 'checkbox' })}
               />
             )}
+
+            <Switch
+              label={t('form.showReceivedFiles')}
+              description={t('form.showReceivedFilesHelp')}
+              {...form.getInputProps('showReceivedFiles', { type: 'checkbox' })}
+            />
 
             <Switch
               label={t('form.enabled')}

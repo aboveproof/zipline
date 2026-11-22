@@ -228,6 +228,7 @@ export const fileRequests = pgTable(
     vanity: text(),
     description: text(),
     enabled: boolean().default(true).notNull(),
+    showReceivedFiles: boolean().default(false).notNull(),
     password: text(),
     expiresAt: timestamp({ precision: 3, mode: 'date', withTimezone: true }),
     maxFiles: integer(),

@@ -74,6 +74,7 @@ export default typedPlugin(
         if (req.body.vanity !== undefined) update.vanity = req.body.vanity ?? null;
         if (req.body.description !== undefined) update.description = req.body.description || null;
         if (req.body.enabled !== undefined) update.enabled = req.body.enabled;
+        if (req.body.showReceivedFiles !== undefined) update.showReceivedFiles = req.body.showReceivedFiles;
         if (req.body.expiresAt !== undefined) update.expiresAt = req.body.expiresAt;
         if (req.body.maxFiles !== undefined) update.maxFiles = req.body.maxFiles;
         if (req.body.maxBytes !== undefined) update.maxBytes = req.body.maxBytes;

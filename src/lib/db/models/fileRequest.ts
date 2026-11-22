@@ -20,6 +20,16 @@ export const fileRequestSchema = fileRequestScalarSchema.extend({
   folderName: z.string().nullable(),
 });
 
+export const publicFileRequestFileSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  originalName: z.string().nullable(),
+  size: z.number(),
+  type: z.string(),
+  createdAt: z.date(),
+  url: z.string(),
+});
+
 export const publicFileRequestSchema = fileRequestSchema
   .pick({
     id: true,
@@ -32,11 +42,15 @@ export const publicFileRequestSchema = fileRequestSchema
     maxBytes: true,
     closeAtBytes: true,
     allowedTypes: true,
+    showReceivedFiles: true,
     passwordProtected: true,
     receivedFiles: true,
     receivedBytes: true,
   })
-  .extend({ open: z.boolean() });
+  .extend({
+    open: z.boolean(),
+    files: z.array(publicFileRequestFileSchema).optional(),
+  });
 
 export type FileRequest = z.infer<typeof fileRequestSchema>;
 export type PublicFileRequest = z.infer<typeof publicFileRequestSchema>;
