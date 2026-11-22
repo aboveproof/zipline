@@ -15,6 +15,7 @@ import {
   Alert,
   Badge,
   Button,
+  Center,
   Collapse,
   Combobox,
   CopyButton,
@@ -23,6 +24,7 @@ import {
   InputBase,
   Modal,
   NumberInput,
+  Pagination,
   Paper,
   PasswordInput,
   Select,
@@ -60,9 +62,11 @@ import {
   IconTextCaption,
   IconTrash,
 } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
+
+const DashboardFile = lazy(() => import('@/components/file/DashboardFile'));
 
 type FileRequestList = Extract<Response['/api/user/file-requests'], any[]>;
 type FileRequest = FileRequestList[number];
@@ -134,8 +138,14 @@ export default function DashboardFileRequests() {
   const { data, error, isLoading, mutate } = useSWR<FileRequestList>('/api/user/file-requests');
   const { data: folders } = useFolders();
   const [editing, setEditing] = useState<FileRequest | null>(null);
+  const [viewing, setViewing] = useState<FileRequest | null>(null);
+  const [filesPage, setFilesPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [now] = useState(() => new Date());
+
+  const { data: viewingFiles, isLoading: viewingFilesLoading } = useSWR<Response['/api/user/files']>(
+    viewing ? `/api/user/files?fileRequest=${viewing.id}&page=${filesPage}&perpage=15` : null,
+  );
 
   const folderCombobox = useCombobox();
   const [folderSearch, setFolderSearch] = useState('');
@@ -279,6 +289,54 @@ export default function DashboardFileRequests() {
 
   return (
     <>
+      <Modal
+        size='xl'
+        zIndex={100}
+        centered
+        opened={!!viewing}
+        onClose={() => {
+          setViewing(null);
+          void mutate();
+        }}
+        title={t('viewFiles.title', { name: viewing?.name })}
+      >
+        {viewingFilesLoading ? (
+          <SimpleGrid my='sm' spacing='md' cols={{ base: 1, md: 2, lg: 3 }}>
+            <Skeleton height={240} animate />
+            <Skeleton height={240} animate />
+            <Skeleton height={240} animate />
+          </SimpleGrid>
+        ) : viewingFiles?.page.length ? (
+          <>
+            <SimpleGrid my='sm' spacing='md' cols={{ base: 1, md: 2, lg: 3 }} pos='relative'>
+              {viewingFiles.page.map((file) => (
+                <Suspense fallback={<Skeleton height={240} animate />} key={file.id}>
+                  <DashboardFile file={file} />
+                </Suspense>
+              ))}
+            </SimpleGrid>
+            {(viewingFiles.pages ?? 1) > 1 && (
+              <Center mt='md'>
+                <Pagination value={filesPage} onChange={setFilesPage} total={viewingFiles.pages ?? 1} />
+              </Center>
+            )}
+          </>
+        ) : (
+          <Text c='dimmed' size='sm' ta='center' py='lg'>
+            {t('viewFiles.empty')}
+          </Text>
+        )}
+
+        <Group justify='space-between' mt='xs'>
+          <Text size='sm' c='dimmed'>
+            {viewing ? `${viewing.route}/${viewing.vanity ?? viewing.id}` : ''}
+          </Text>
+          <Text size='sm' c='dimmed'>
+            {t('viewFiles.found', { count: viewingFiles?.total ?? viewing?.receivedFiles ?? 0 })}
+          </Text>
+        </Group>
+      </Modal>
+
       <Modal
         centered
         opened={modalOpen}
@@ -591,7 +649,18 @@ export default function DashboardFileRequests() {
                 : null,
             ].filter(Boolean);
             return (
-              <Paper withBorder p='sm' key={request.id}>
+              <Paper
+                withBorder
+                p='sm'
+                key={request.id}
+                style={{ cursor: request.receivedFiles > 0 ? 'pointer' : undefined }}
+                onClick={() => {
+                  if (request.receivedFiles > 0) {
+                    setViewing(request);
+                    setFilesPage(1);
+                  }
+                }}
+              >
                 <Group justify='space-between' align='flex-start' wrap='nowrap'>
                   <div style={{ minWidth: 0 }}>
                     <Group gap='xs'>
@@ -616,7 +685,7 @@ export default function DashboardFileRequests() {
                       </Text>
                     )}
                   </div>
-                  <Group gap={4} wrap='nowrap'>
+                  <Group gap={4} wrap='nowrap' onClick={(e) => e.stopPropagation()}>
                     <Tooltip label={t('openLink')}>
                       <ActionIcon
                         component='a'

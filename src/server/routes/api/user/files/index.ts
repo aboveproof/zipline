@@ -42,6 +42,7 @@ export default typedPlugin(
             searchQuery: z.string().optional(),
             id: z.string().optional(),
             folder: z.string().optional(),
+            fileRequest: z.string().optional(),
           }),
           response: {
             200: responseSchema,
@@ -56,8 +57,18 @@ export default typedPlugin(
         if (!user || (user.id !== req.user.id && !canInteract(req.user.role, user.role)))
           throw new ApiError(9002);
 
-        const { perpage, searchQuery, searchField, page, filter, favorite, sortBy, order, folder } =
-          req.query;
+        const {
+          perpage,
+          searchQuery,
+          searchField,
+          page,
+          filter,
+          favorite,
+          sortBy,
+          order,
+          folder,
+          fileRequest,
+        } = req.query;
 
         let folderId: string | undefined;
         if (folder) {
@@ -65,6 +76,17 @@ export default typedPlugin(
           if (!targetFolder || !canManage(req.user, targetFolder.user)) throw new ApiError(9002);
 
           folderId = targetFolder.id;
+        }
+
+        let fileRequestId: string | undefined;
+        if (fileRequest) {
+          const targetRequest = await db.query.fileRequests.findFirst({
+            columns: { id: true, userId: true },
+            where: { id: fileRequest },
+          });
+          if (!targetRequest || targetRequest.userId !== user.id) throw new ApiError(4012);
+
+          fileRequestId = targetRequest.id;
         }
 
         const incompleteIds = db
@@ -101,6 +123,7 @@ export default typedPlugin(
               : undefined,
             favorite && filter !== 'all' ? eq(file.favorite, true) : undefined,
             folderId ? eq(file.folderId, folderId) : undefined,
+            fileRequestId ? eq(file.fileRequestId, fileRequestId) : undefined,
             notInArray(file.id, incompleteIds),
             searchQuery && searchField !== 'tags' ? containsText(file[searchField], searchQuery) : undefined,
           )!;

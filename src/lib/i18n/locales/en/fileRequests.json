@@ -91,6 +91,12 @@
     "description": "The link will stop working. Files already received will stay in your account.",
     "confirm": "Delete request"
   },
+  "viewFiles": {
+    "title": "Files received in {{name}}",
+    "found_one": "{{count}} file",
+    "found_other": "{{count}} files",
+    "empty": "No files received yet."
+  },
   "notifications": {
     "saveFailed": "File request could not be saved",
     "deleteFailed": "File request could not be deleted",
