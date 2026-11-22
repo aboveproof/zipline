@@ -155,9 +155,14 @@ export default function DashboardFileRequests() {
   const [currentFileId, setCurrentFileId, setNavFiles] = useFileNavStore(
     useShallow((state) => [state.current, state.setCurrent, state.setFiles]),
   );
-  const viewingFileIds = useMemo(() => (viewingFiles?.page ?? []).map((file) => file.id), [viewingFiles?.page]);
+  const viewingFileIds = useMemo(
+    () => (viewingFiles?.page ?? []).map((file) => file.id),
+    [viewingFiles?.page],
+  );
   const activeViewingFile =
-    viewing && currentFileId ? (viewingFiles?.page.find((file) => file.id === currentFileId) ?? null) : null;
+    viewing && currentFileId
+      ? (viewingFiles?.page.find((file) => file.id === currentFileId) ?? null)
+      : null;
 
   useEffect(() => {
     if (viewing) setNavFiles(viewingFileIds);
