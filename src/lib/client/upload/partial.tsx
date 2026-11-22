@@ -56,6 +56,7 @@ export async function uploadPartialFiles(
     ephemeral,
     config,
     folder,
+    fileRequest,
   }: UploadHandlers &
     UploadHeadersOptions & {
       config: SafeConfig;
@@ -130,7 +131,7 @@ export async function uploadPartialFiles(
             req.addEventListener('abort', () => reject(new Error(i18n.t('upload:errors.network'))));
 
             req.open('POST', '/api/upload/partial');
-            applyUploadHeaders(req, { options, ephemeral, folder });
+            applyUploadHeaders(req, { options, ephemeral, folder, fileRequest });
 
             token && req.setRequestHeader('x-zipline-p-token', token);
             req.setRequestHeader('x-zipline-p-filename', encodeURIComponent(file.name));

@@ -119,6 +119,7 @@ export async function uploadFiles(
     options,
     ephemeral,
     folder,
+    fileRequest,
     partials,
     showResult = true,
   }: UploadContextHandlers & UploadHeadersOptions & { showResult?: boolean },
@@ -187,7 +188,7 @@ export async function uploadFiles(
       });
 
       req.open('POST', '/api/upload');
-      applyUploadHeaders(req, { options, ephemeral, folder });
+      applyUploadHeaders(req, { options, ephemeral, folder, fileRequest });
       req.send(body);
     });
 
