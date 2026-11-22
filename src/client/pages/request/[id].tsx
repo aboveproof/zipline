@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconClock, IconFileArrowRight, IconLock } from '@tabler/icons-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { data, Params, useLoaderData } from 'react-router-dom';
 
@@ -45,17 +45,15 @@ export async function loader({ params }: { params: Params<string> }) {
 export function Component() {
   const { t } = useTranslation('fileRequests');
   const { request: initialRequest, config } = useLoaderData<typeof loader>();
-  const [request, setRequest] = useState<PublicRequest>(initialRequest);
-  const [token, setToken] = useState<string>();
+  const [refreshedState, setRefreshedState] = useState<{ id: string; request: PublicRequest } | null>(null);
+  const [tokenState, setTokenState] = useState<{ id: string; token: string } | null>(null);
 
-  useEffect(() => {
-    setRequest(initialRequest);
-    setToken(undefined);
-  }, [initialRequest]);
+  const request = refreshedState?.id === initialRequest.id ? refreshedState.request : initialRequest;
+  const token = tokenState?.id === initialRequest.id ? tokenState.token : undefined;
 
   const refreshRequest = useCallback(async () => {
     const { data: refreshed } = await fetchApi<PublicRequest>(`/api/file-request/${request.id}`);
-    if (refreshed) setRequest(refreshed);
+    if (refreshed) setRefreshedState({ id: request.id, request: refreshed });
   }, [request.id]);
 
   const uploadRequest = useMemo(
@@ -79,7 +77,7 @@ export function Component() {
       passwordForm.setFieldError('password', t('public.passwordInvalid'));
       return;
     }
-    setToken(result.token);
+    setTokenState({ id: request.id, token: result.token });
     passwordForm.reset();
   });
 
