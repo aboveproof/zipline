@@ -114,6 +114,6 @@
     "passwordRequired": "Enter the request password",
     "passwordInvalid": "That password is incorrect",
     "unlock": "Continue",
-    "privacy": "This page accepts uploads only. It does not show files or folders stored in Zipline."
+    "privacy": "This page accepts uploads only. It does not show any stored files or folders."
   }
 }
