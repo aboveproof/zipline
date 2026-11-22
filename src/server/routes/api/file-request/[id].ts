@@ -8,6 +8,7 @@ import {
   publicFileRequestSchema,
   type PublicFileRequest,
 } from '@/lib/db/models/fileRequest';
+import { normalizeFileRequestRoute } from '@/lib/fileRequestTypes';
 import { secondlyRatelimit } from '@/lib/ratelimits';
 import typedPlugin from '@/server/typedPlugin';
 import { z } from 'zod';
@@ -15,6 +16,7 @@ import { z } from 'zod';
 export type ApiFileRequestResponse = (PublicFileRequest & { open: boolean }) | { token: string };
 
 const paramsSchema = z.object({ id: z.string() });
+const querySchema = z.object({ route: z.string().optional() });
 export const PATH = '/api/file-request/:id';
 
 export default typedPlugin(
@@ -25,11 +27,13 @@ export default typedPlugin(
         schema: {
           description: 'Get the public details and limits for a file request link.',
           params: paramsSchema,
+          querystring: querySchema,
           response: { 200: publicFileRequestSchema },
         },
       },
       async (req, res) => {
-        const row = await findFileRequestBySlug(req.params.id);
+        const route = req.query.route ? normalizeFileRequestRoute(req.query.route) : undefined;
+        const row = await findFileRequestBySlug(req.params.id, route);
         if (!row) throw new ApiError(4012);
 
         const [request] = await listFileRequests(row.userId, row.id);
@@ -47,13 +51,15 @@ export default typedPlugin(
         schema: {
           description: 'Verify a file request password and return a short-lived upload token.',
           params: paramsSchema,
+          querystring: querySchema,
           body: z.object({ password: z.string().max(256) }),
           response: { 200: z.object({ token: z.string() }) },
         },
         ...secondlyRatelimit(2),
       },
       async (req, res) => {
-        const request = await findFileRequestBySlug(req.params.id);
+        const route = req.query.route ? normalizeFileRequestRoute(req.query.route) : undefined;
+        const request = await findFileRequestBySlug(req.params.id, route);
         if (!request) throw new ApiError(4012);
         const [summary] = await listFileRequests(request.userId, request.id);
         if (!summary || !fileRequestIsOpen(summary)) throw new ApiError(1073);

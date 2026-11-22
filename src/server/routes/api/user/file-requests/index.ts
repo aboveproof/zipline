@@ -1,4 +1,5 @@
 import { ApiError } from '@/lib/api/errors';
+import { config } from '@/lib/config';
 import { hashPassword } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import {
@@ -10,8 +11,14 @@ import {
 } from '@/lib/db/models/fileRequest';
 import { getFolderMetadata } from '@/lib/db/models/folder';
 import { fileRequests } from '@/lib/db/schema';
-import { isValidFileRequestVanity } from '@/lib/fileRequestTypes';
+import {
+  DEFAULT_FILE_REQUEST_ROUTE,
+  isValidFileRequestRoute,
+  isValidFileRequestVanity,
+  normalizeFileRequestRoute,
+} from '@/lib/fileRequestTypes';
 import { log } from '@/lib/logger';
+import { RESERVED_ROUTES } from '@/lib/reservedRoutes';
 import { zStringTrimmed } from '@/lib/validation';
 import { userMiddleware } from '@/server/middleware/user';
 import typedPlugin from '@/server/typedPlugin';
@@ -19,8 +26,33 @@ import { z } from 'zod';
 
 export type ApiUserFileRequestsResponse = FileRequest[] | FileRequest;
 
+export function assertValidFileRequestRoute(route: string) {
+  const lower = route.toLowerCase();
+  const blocked = [
+    ...RESERVED_ROUTES.filter((r) => r !== DEFAULT_FILE_REQUEST_ROUTE),
+    '/folder',
+    config.files.route,
+    config.urls.route,
+  ]
+    .map((r) => r.trim().toLowerCase())
+    .filter((r) => r !== '' && r !== '/');
+
+  if (blocked.includes(lower))
+    throw new ApiError(1000, 'Route prefix conflicts with an existing Zipline route.');
+}
+
 export const fileRequestInputSchema = z.object({
   name: zStringTrimmed.min(1).max(120),
+  route: z
+    .string()
+    .trim()
+    .max(62)
+    .refine(
+      (str) => isValidFileRequestRoute(str),
+      'Route prefix can only contain letters, numbers, hyphens, and underscores.',
+    )
+    .transform((str) => normalizeFileRequestRoute(str))
+    .optional(),
   vanity: z
     .string()
     .trim()
@@ -96,6 +128,9 @@ export default typedPlugin(
           if (!folder || folder.userId !== req.user.id) throw new ApiError(4001);
         }
 
+        const route = req.body.route ?? DEFAULT_FILE_REQUEST_ROUTE;
+        assertValidFileRequestRoute(route);
+
         if (req.body.vanity && (await fileRequestIdentifierExists(req.body.vanity))) throw new ApiError(1042);
 
         const [created] = await db
@@ -103,6 +138,7 @@ export default typedPlugin(
           .values({
             userId: req.user.id,
             name: req.body.name,
+            route,
             vanity: req.body.vanity ?? null,
             description: req.body.description || null,
             enabled: req.body.enabled ?? true,

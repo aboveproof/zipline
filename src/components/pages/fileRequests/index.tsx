@@ -3,7 +3,12 @@ import { Response } from '@/lib/api/response';
 import { bytes } from '@/lib/bytes';
 import { useFolders } from '@/lib/client/hooks/useFolders';
 import { fetchApi } from '@/lib/fetchApi';
-import { isValidFileRequestVanity } from '@/lib/fileRequestTypes';
+import {
+  DEFAULT_FILE_REQUEST_ROUTE,
+  isValidFileRequestRoute,
+  isValidFileRequestVanity,
+  normalizeFileRequestRoute,
+} from '@/lib/fileRequestTypes';
 import { buildFolderHierarchy } from '@/lib/folderHierarchy';
 import {
   ActionIcon,
@@ -64,6 +69,7 @@ type FileRequest = FileRequestList[number];
 
 type FormValues = {
   name: string;
+  route: string;
   vanity: string;
   description: string;
   enabled: boolean;
@@ -103,6 +109,7 @@ function editableSize(value: number | null): { amount: number | string; unit: Si
 
 const initialValues: FormValues = {
   name: '',
+  route: DEFAULT_FILE_REQUEST_ROUTE,
   vanity: '',
   description: '',
   enabled: true,
@@ -142,6 +149,7 @@ export default function DashboardFileRequests() {
     initialValues,
     validate: {
       name: (value) => (value.trim() ? null : t('form.nameRequired')),
+      route: (value) => (isValidFileRequestRoute(value) ? null : t('form.routeInvalid')),
       vanity: (value) => {
         const trimmed = value.trim();
         return !trimmed || isValidFileRequestVanity(trimmed) ? null : t('form.vanityInvalid');
@@ -182,6 +190,7 @@ export default function DashboardFileRequests() {
     setEditing(request);
     form.setValues({
       name: request.name,
+      route: request.route ?? DEFAULT_FILE_REQUEST_ROUTE,
       vanity: request.vanity ?? '',
       description: request.description ?? '',
       enabled: request.enabled,
@@ -208,6 +217,7 @@ export default function DashboardFileRequests() {
   const submit = form.onSubmit(async (values) => {
     const payload = {
       name: values.name.trim(),
+      route: normalizeFileRequestRoute(values.route),
       vanity: values.vanity.trim() || null,
       description: values.description.trim() || null,
       enabled: values.enabled,
@@ -285,13 +295,26 @@ export default function DashboardFileRequests() {
               {...form.getInputProps('name')}
             />
 
-            <TextInput
-              label={t('form.vanity')}
-              description={t('form.vanityHelp')}
-              placeholder={t('form.vanityPlaceholder')}
-              leftSection={<IconLink size='1rem' />}
-              {...form.getInputProps('vanity')}
-            />
+            <div>
+              <Group gap='xs' align='flex-start' wrap='nowrap'>
+                <TextInput
+                  label={t('form.route')}
+                  placeholder={t('form.routePlaceholder')}
+                  leftSection={<IconLink size='1rem' />}
+                  w={150}
+                  {...form.getInputProps('route')}
+                />
+                <TextInput
+                  label={t('form.vanity')}
+                  placeholder={t('form.vanityPlaceholder')}
+                  style={{ flex: 1 }}
+                  {...form.getInputProps('vanity')}
+                />
+              </Group>
+              <Text c='dimmed' size='xs' mt={4}>
+                {`${normalizeFileRequestRoute(form.values.route)}/${form.values.vanity.trim() || (editing?.id ?? 'id')}`}
+              </Text>
+            </div>
 
             <Textarea
               label={t('form.description')}
@@ -557,7 +580,7 @@ export default function DashboardFileRequests() {
               (request.maxFiles !== null && request.receivedFiles >= request.maxFiles) ||
               (request.closeAtBytes !== null && request.receivedBytes >= request.closeAtBytes);
             const open = request.enabled && !expired && !full;
-            const url = `${window.location.origin}/request/${request.vanity ?? request.id}`;
+            const url = `${window.location.origin}${request.route}/${request.vanity ?? request.id}`;
             const closingRules = [
               request.maxFiles !== null ? t('card.closesAfterFiles', { count: request.maxFiles }) : null,
               request.closeAtBytes !== null

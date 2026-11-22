@@ -1,7 +1,18 @@
+export const DEFAULT_FILE_REQUEST_ROUTE = '/request';
 export const FILE_REQUEST_VANITY_REGEX = /^[a-zA-Z0-9_-]+$/;
 
 export function isValidFileRequestVanity(value: string) {
   return FILE_REQUEST_VANITY_REGEX.test(value);
+}
+
+export function normalizeFileRequestRoute(value: string) {
+  const trimmed = value.trim().replace(/^\/+|\/+$/g, '');
+  return trimmed ? `/${trimmed}` : DEFAULT_FILE_REQUEST_ROUTE;
+}
+
+export function isValidFileRequestRoute(value: string) {
+  const trimmed = value.trim().replace(/^\/+|\/+$/g, '');
+  return trimmed === '' || (trimmed.length <= 60 && FILE_REQUEST_VANITY_REGEX.test(trimmed));
 }
 
 export function normalizeAllowedTypes(types: string[]) {

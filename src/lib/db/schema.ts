@@ -224,6 +224,7 @@ export const fileRequests = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     name: text().notNull(),
+    route: text().default('/request').notNull(),
     vanity: text(),
     description: text(),
     enabled: boolean().default(true).notNull(),

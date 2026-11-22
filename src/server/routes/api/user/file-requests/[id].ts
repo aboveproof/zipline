@@ -14,7 +14,7 @@ import { userMiddleware } from '@/server/middleware/user';
 import typedPlugin from '@/server/typedPlugin';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { fileRequestInputSchema } from '.';
+import { assertValidFileRequestRoute, fileRequestInputSchema } from '.';
 
 const logger = log('api').c('user').c('file-requests').c('[id]');
 const paramsSchema = z.object({ id: z.string() });
@@ -40,6 +40,8 @@ export default typedPlugin(
           where: { id: req.params.id, userId: req.user.id },
         });
         if (!current) throw new ApiError(4012);
+
+        if (req.body.route !== undefined) assertValidFileRequestRoute(req.body.route);
 
         if (
           req.body.vanity &&
@@ -68,6 +70,7 @@ export default typedPlugin(
 
         const update: Partial<typeof fileRequests.$inferInsert> = {};
         if (req.body.name !== undefined) update.name = req.body.name;
+        if (req.body.route !== undefined) update.route = req.body.route;
         if (req.body.vanity !== undefined) update.vanity = req.body.vanity ?? null;
         if (req.body.description !== undefined) update.description = req.body.description || null;
         if (req.body.enabled !== undefined) update.enabled = req.body.enabled;

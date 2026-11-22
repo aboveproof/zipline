@@ -1,9 +1,10 @@
 import { ApiError, RedirectError } from '@/lib/api/errors';
+import { findFileRequestBySlug } from '@/lib/db/models/fileRequest';
 import type { FastifyInstance } from 'fastify';
 import { hasZodFastifySchemaValidationErrors, isResponseSerializationError } from 'fastify-type-provider-zod';
 
 export function registerHandlers(server: FastifyInstance, mode: string) {
-  server.setNotFoundHandler((req, res) => {
+  server.setNotFoundHandler(async (req, res) => {
     if (mode === 'development' && server.vite)
       return res.status(404).send({
         message: `Route ${req.method}:${req.url} not found`,
@@ -19,6 +20,19 @@ export function registerHandlers(server: FastifyInstance, mode: string) {
         statusCode: 404,
       });
     } else {
+      if (req.method === 'GET') {
+        const pathname = req.url.split('?')[0];
+        const match = /^\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_-]+)$/.exec(pathname);
+        if (match) {
+          const [, prefix, slug] = match;
+          const fileRequest = await findFileRequestBySlug(slug, `/${prefix}`);
+          if (fileRequest) {
+            res.status(200);
+            return res.serveIndex();
+          }
+        }
+      }
+
       res.status(404);
       return res.serveIndex();
     }

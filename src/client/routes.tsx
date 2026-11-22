@@ -96,6 +96,10 @@ export const router = createBrowserRouter([
             lazy: () => import('./pages/request/[id]'),
           },
           {
+            path: ':route/:id',
+            lazy: () => import('./pages/request/[id]'),
+          },
+          {
             path: 'folder/:id',
             children: [
               {

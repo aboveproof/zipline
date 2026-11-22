@@ -29,8 +29,9 @@ import { data, Params, useLoaderData } from 'react-router-dom';
 type PublicRequest = Extract<Response['/api/file-request/[id]'], { open: boolean }>;
 
 export async function loader({ params }: { params: Params<string> }) {
+  const route = params.route ? `/${params.route}` : '/request';
   const [requestResponse, configResponse] = await Promise.all([
-    fetch(`/api/file-request/${params.id}`),
+    fetch(`/api/file-request/${params.id}?route=${encodeURIComponent(route)}`),
     fetch('/api/server/public'),
   ]);
   if (!requestResponse.ok) throw data('File request not found', { status: 404 });
@@ -52,9 +53,11 @@ export function Component() {
   const token = tokenState?.id === initialRequest.id ? tokenState.token : undefined;
 
   const refreshRequest = useCallback(async () => {
-    const { data: refreshed } = await fetchApi<PublicRequest>(`/api/file-request/${request.id}`);
+    const { data: refreshed } = await fetchApi<PublicRequest>(
+      `/api/file-request/${request.id}?route=${encodeURIComponent(request.route)}`,
+    );
     if (refreshed) setRefreshedState({ id: request.id, request: refreshed });
-  }, [request.id]);
+  }, [request.id, request.route]);
 
   const uploadRequest = useMemo(
     () => ({ id: request.id, token, allowedTypes: request.allowedTypes }),

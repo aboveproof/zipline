@@ -23,6 +23,7 @@ export const fileRequestSchema = fileRequestScalarSchema.extend({
 export const publicFileRequestSchema = fileRequestSchema
   .pick({
     id: true,
+    route: true,
     vanity: true,
     name: true,
     description: true,
@@ -74,17 +75,19 @@ export async function listFileRequests(userId: string, id?: string, client: DbCl
     .orderBy(desc(fileRequests.createdAt));
 }
 
-export async function findFileRequestBySlug(slug: string, client: DbClient = db) {
+export async function findFileRequestBySlug(slug: string, route?: string, client: DbClient = db) {
+  const slugCondition = or(eq(fileRequests.id, slug), eq(fileRequests.vanity, slug));
   const [request] = await client
     .select({
       id: fileRequests.id,
       userId: fileRequests.userId,
+      route: fileRequests.route,
       enabled: fileRequests.enabled,
       expiresAt: fileRequests.expiresAt,
       password: fileRequests.password,
     })
     .from(fileRequests)
-    .where(or(eq(fileRequests.id, slug), eq(fileRequests.vanity, slug)))
+    .where(route ? and(eq(fileRequests.route, route), slugCondition) : slugCondition)
     .limit(1);
 
   return request ?? null;
