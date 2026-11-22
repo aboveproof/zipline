@@ -40,8 +40,9 @@
     "closeSizeAboveLimit": "The closing size must be at or below the storage limit",
     "expirationRequired": "Choose a closing date or turn this condition off",
     "sections": {
-      "limits": "Upload limits",
-      "limitsHelp": "Storage limits block extra uploads. Close conditions turn the link off."
+      "limits": "Limits & closing",
+      "limitsHelp": "Storage limits block extra uploads. Close conditions turn the link off.",
+      "access": "Access & restrictions"
     },
     "description": "Instructions",
     "descriptionHelp": "Tell uploaders what to send. This appears on the public page.",

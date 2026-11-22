@@ -1,15 +1,20 @@
+import FolderComboboxOptions from '@/components/folders/FolderComboboxOptions';
 import { Response } from '@/lib/api/response';
 import { bytes } from '@/lib/bytes';
 import { useFolders } from '@/lib/client/hooks/useFolders';
 import { fetchApi } from '@/lib/fetchApi';
+import { buildFolderHierarchy } from '@/lib/folderHierarchy';
 import {
   ActionIcon,
   Alert,
   Badge,
   Button,
+  Collapse,
+  Combobox,
   CopyButton,
   Divider,
   Group,
+  InputBase,
   Modal,
   NumberInput,
   Paper,
@@ -25,6 +30,7 @@ import {
   TextInput,
   Title,
   Tooltip,
+  useCombobox,
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
@@ -34,12 +40,19 @@ import {
   IconCheck,
   IconClipboardCopy,
   IconClock,
+  IconDatabase,
   IconEdit,
   IconFileArrowRight,
+  IconFiles,
+  IconFilter,
+  IconFolderPlus,
+  IconKey,
+  IconPencil,
   IconPlus,
+  IconTextCaption,
   IconTrash,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
 
@@ -112,6 +125,14 @@ export default function DashboardFileRequests() {
   const [modalOpen, setModalOpen] = useState(false);
   const [now] = useState(() => new Date());
 
+  const folderCombobox = useCombobox();
+  const [folderSearch, setFolderSearch] = useState('');
+
+  const folderOptions = useMemo(() => {
+    if (!folders) return [];
+    return buildFolderHierarchy(folders);
+  }, [folders]);
+
   const form = useForm<FormValues>({
     initialValues,
     validate: {
@@ -141,12 +162,14 @@ export default function DashboardFileRequests() {
     setEditing(null);
     form.setValues(initialValues);
     form.resetDirty();
+    setFolderSearch(t('form.rootFolder'));
     setModalOpen(true);
   };
 
   const openEdit = (request: FileRequest) => {
     const storageLimit = editableSize(request.maxBytes);
     const closeSize = editableSize(request.closeAtBytes);
+    const selectedFolder = folderOptions.find((f) => f.id === request.folderId);
     setEditing(request);
     form.setValues({
       name: request.name,
@@ -168,6 +191,7 @@ export default function DashboardFileRequests() {
       folderId: request.folderId,
     });
     form.resetDirty();
+    setFolderSearch(selectedFolder?.path ?? request.folderName ?? t('form.rootFolder'));
     setModalOpen(true);
   };
 
@@ -235,191 +259,267 @@ export default function DashboardFileRequests() {
   return (
     <>
       <Modal
+        centered
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? t('form.editTitle') : t('form.createTitle')}
-        size='lg'
-        centered
       >
         <form onSubmit={submit}>
-          <Stack gap='md'>
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing='sm'>
-              <TextInput
-                label={t('form.name')}
-                placeholder={t('form.namePlaceholder')}
-                {...form.getInputProps('name')}
-              />
-              <Select
-                clearable
-                searchable
-                label={t('form.folder')}
-                placeholder={t('form.rootFolder')}
-                data={(folders ?? []).map((folder) => ({ value: folder.id, label: folder.name }))}
-                {...form.getInputProps('folderId')}
-              />
-            </SimpleGrid>
+          <Stack gap='sm'>
+            <TextInput
+              withAsterisk
+              label={t('form.name')}
+              placeholder={t('form.namePlaceholder')}
+              leftSection={<IconTextCaption size='1rem' />}
+              {...form.getInputProps('name')}
+            />
+
             <Textarea
               label={t('form.description')}
               description={t('form.descriptionHelp')}
               autosize
-              minRows={1}
-              maxRows={3}
+              minRows={2}
+              maxRows={4}
               {...form.getInputProps('description')}
+            />
+
+            <Combobox
+              store={folderCombobox}
+              withinPortal={false}
+              onOptionSubmit={(value) => {
+                if (value === '__root__') {
+                  setFolderSearch(t('form.rootFolder'));
+                  form.setFieldValue('folderId', null);
+                } else {
+                  const selected = folderOptions.find((f) => f.id === value);
+                  setFolderSearch(selected?.path || '');
+                  form.setFieldValue('folderId', value);
+                }
+                folderCombobox.closeDropdown();
+              }}
+            >
+              <Combobox.Target>
+                <InputBase
+                  label={t('form.folder')}
+                  description={t('form.folderHelp')}
+                  rightSection={<Combobox.Chevron />}
+                  leftSection={<IconFolderPlus size='1rem' />}
+                  value={folderSearch}
+                  onChange={(event) => {
+                    folderCombobox.openDropdown();
+                    folderCombobox.updateSelectedOptionIndex();
+                    setFolderSearch(event.currentTarget.value);
+                  }}
+                  onClick={() => {
+                    folderCombobox.openDropdown();
+                    setFolderSearch('');
+                  }}
+                  onFocus={() => {
+                    folderCombobox.openDropdown();
+                    setFolderSearch('');
+                  }}
+                  onBlur={() => {
+                    folderCombobox.closeDropdown();
+                    if (form.values.folderId === null) {
+                      setFolderSearch(t('form.rootFolder'));
+                    } else {
+                      const selected = folderOptions.find((f) => f.id === form.values.folderId);
+                      setFolderSearch(selected?.path || '');
+                    }
+                  }}
+                  placeholder={t('form.rootFolder')}
+                  rightSectionPointerEvents='none'
+                />
+              </Combobox.Target>
+
+              <Combobox.Dropdown>
+                <FolderComboboxOptions
+                  folderOptions={folderOptions}
+                  searchValue={folderSearch}
+                  additionalOptions={
+                    <Combobox.Option value='__root__'>{t('form.rootFolder')}</Combobox.Option>
+                  }
+                />
+              </Combobox.Dropdown>
+            </Combobox>
+
+            <Divider />
+
+            <div>
+              <Text c='dimmed' size='sm'>
+                <b>{t('form.sections.limits')}</b>
+              </Text>
+              <Text c='dimmed' size='xs'>
+                {t('form.sections.limitsHelp')}
+              </Text>
+            </div>
+
+            <div>
+              <Switch
+                label={t('form.storageLimit')}
+                description={t('form.storageLimitHelp')}
+                {...form.getInputProps('storageLimitEnabled', { type: 'checkbox' })}
+              />
+              <Collapse expanded={form.values.storageLimitEnabled}>
+                <Group gap='xs' align='flex-start' wrap='nowrap' pt='xs'>
+                  <NumberInput
+                    aria-label={t('form.storageLimit')}
+                    placeholder={t('form.sizePlaceholder')}
+                    leftSection={<IconDatabase size='1rem' />}
+                    min={0.01}
+                    decimalScale={2}
+                    style={{ flex: 1 }}
+                    {...form.getInputProps('storageLimit')}
+                  />
+                  <Select
+                    aria-label={t('form.sizeUnit')}
+                    data={Object.keys(sizeUnits)}
+                    allowDeselect={false}
+                    w={84}
+                    comboboxProps={{ withinPortal: true }}
+                    {...form.getInputProps('storageLimitUnit')}
+                  />
+                </Group>
+              </Collapse>
+            </div>
+
+            <div>
+              <Switch
+                label={t('form.stopAfterFiles')}
+                description={t('form.stopAfterFilesHelp')}
+                {...form.getInputProps('maxFilesEnabled', { type: 'checkbox' })}
+              />
+              <Collapse expanded={form.values.maxFilesEnabled}>
+                <NumberInput
+                  pt='xs'
+                  aria-label={t('form.maxFiles')}
+                  placeholder={t('form.fileCountPlaceholder')}
+                  leftSection={<IconFiles size='1rem' />}
+                  min={1}
+                  max={1000}
+                  allowDecimal={false}
+                  {...form.getInputProps('maxFiles')}
+                />
+              </Collapse>
+            </div>
+
+            <div>
+              <Switch
+                label={t('form.stopAfterSize')}
+                description={t('form.stopAfterSizeHelp')}
+                {...form.getInputProps('closeSizeEnabled', { type: 'checkbox' })}
+              />
+              <Collapse expanded={form.values.closeSizeEnabled}>
+                <Group gap='xs' align='flex-start' wrap='nowrap' pt='xs'>
+                  <NumberInput
+                    aria-label={t('form.closeSize')}
+                    placeholder={t('form.sizePlaceholder')}
+                    leftSection={<IconDatabase size='1rem' />}
+                    min={0.01}
+                    decimalScale={2}
+                    style={{ flex: 1 }}
+                    {...form.getInputProps('closeSize')}
+                  />
+                  <Select
+                    aria-label={t('form.sizeUnit')}
+                    data={Object.keys(sizeUnits)}
+                    allowDeselect={false}
+                    w={84}
+                    comboboxProps={{ withinPortal: true }}
+                    {...form.getInputProps('closeSizeUnit')}
+                  />
+                </Group>
+              </Collapse>
+            </div>
+
+            <div>
+              <Switch
+                label={t('form.stopAtTime')}
+                description={t('form.stopAtTimeHelp')}
+                {...form.getInputProps('expiresEnabled', { type: 'checkbox' })}
+              />
+              <Collapse expanded={form.values.expiresEnabled}>
+                <DateTimePicker
+                  pt='xs'
+                  clearable
+                  minDate={now}
+                  aria-label={t('form.expiresAt')}
+                  placeholder={t('form.timePlaceholder')}
+                  leftSection={<IconClock size='1rem' />}
+                  popoverProps={{ withinPortal: true }}
+                  {...form.getInputProps('expiresAt')}
+                />
+              </Collapse>
+            </div>
+
+            <Divider />
+
+            <Text c='dimmed' size='sm'>
+              <b>{t('form.sections.access')}</b>
+            </Text>
+
+            <TagsInput
+              label={t('form.allowedTypes')}
+              description={t('form.allowedTypesHelp')}
+              placeholder={t('form.allowedTypesPlaceholder')}
+              leftSection={<IconFilter size='1rem' />}
+              splitChars={[',', ' ']}
+              clearable
+              {...form.getInputProps('allowedTypes')}
+            />
+
+            <PasswordInput
+              label={t('form.password')}
+              description={editing ? t('form.passwordEditHelp') : t('form.passwordHelp')}
+              leftSection={<IconKey size='1rem' />}
+              autoComplete='off'
+              disabled={form.values.removePassword}
+              {...form.getInputProps('password')}
+            />
+
+            {editing?.passwordProtected && (
+              <Switch
+                label={t('form.removePassword')}
+                {...form.getInputProps('removePassword', { type: 'checkbox' })}
+              />
+            )}
+
+            <Switch
+              label={t('form.enabled')}
+              description={t('form.enabledHelp')}
+              {...form.getInputProps('enabled', { type: 'checkbox' })}
             />
 
             <Divider />
 
-            <Stack gap='xs'>
-              <div>
-                <Text fw={600}>{t('form.sections.limits')}</Text>
-                <Text c='dimmed' size='xs'>
-                  {t('form.sections.limitsHelp')}
-                </Text>
-              </div>
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing='md' verticalSpacing='sm'>
-                <Stack gap={6}>
-                  <Switch
-                    label={t('form.storageLimit')}
-                    description={t('form.storageLimitHelp')}
-                    {...form.getInputProps('storageLimitEnabled', { type: 'checkbox' })}
-                  />
-                  <Group gap='xs' align='flex-start' wrap='nowrap'>
-                    <NumberInput
-                      aria-label={t('form.storageLimit')}
-                      placeholder={t('form.sizePlaceholder')}
-                      min={0.01}
-                      decimalScale={2}
-                      disabled={!form.values.storageLimitEnabled}
-                      style={{ flex: 1 }}
-                      {...form.getInputProps('storageLimit')}
-                    />
-                    <Select
-                      aria-label={t('form.sizeUnit')}
-                      data={Object.keys(sizeUnits)}
-                      allowDeselect={false}
-                      disabled={!form.values.storageLimitEnabled}
-                      w={84}
-                      {...form.getInputProps('storageLimitUnit')}
-                    />
-                  </Group>
-                </Stack>
-                <Stack gap={6}>
-                  <Switch
-                    label={t('form.stopAfterFiles')}
-                    description={t('form.stopAfterFilesHelp')}
-                    {...form.getInputProps('maxFilesEnabled', { type: 'checkbox' })}
-                  />
-                  <NumberInput
-                    aria-label={t('form.maxFiles')}
-                    placeholder={t('form.fileCountPlaceholder')}
-                    min={1}
-                    max={1000}
-                    allowDecimal={false}
-                    disabled={!form.values.maxFilesEnabled}
-                    {...form.getInputProps('maxFiles')}
-                  />
-                </Stack>
-                <Stack gap={6}>
-                  <Switch
-                    label={t('form.stopAfterSize')}
-                    description={t('form.stopAfterSizeHelp')}
-                    {...form.getInputProps('closeSizeEnabled', { type: 'checkbox' })}
-                  />
-                  <Group gap='xs' align='flex-start' wrap='nowrap'>
-                    <NumberInput
-                      aria-label={t('form.closeSize')}
-                      placeholder={t('form.sizePlaceholder')}
-                      min={0.01}
-                      decimalScale={2}
-                      disabled={!form.values.closeSizeEnabled}
-                      style={{ flex: 1 }}
-                      {...form.getInputProps('closeSize')}
-                    />
-                    <Select
-                      aria-label={t('form.sizeUnit')}
-                      data={Object.keys(sizeUnits)}
-                      allowDeselect={false}
-                      disabled={!form.values.closeSizeEnabled}
-                      w={84}
-                      {...form.getInputProps('closeSizeUnit')}
-                    />
-                  </Group>
-                </Stack>
-                <Stack gap={6}>
-                  <Switch
-                    label={t('form.stopAtTime')}
-                    description={t('form.stopAtTimeHelp')}
-                    {...form.getInputProps('expiresEnabled', { type: 'checkbox' })}
-                  />
-                  <DateTimePicker
-                    clearable
-                    minDate={now}
-                    aria-label={t('form.expiresAt')}
-                    placeholder={t('form.timePlaceholder')}
-                    disabled={!form.values.expiresEnabled}
-                    {...form.getInputProps('expiresAt')}
-                  />
-                </Stack>
-              </SimpleGrid>
-            </Stack>
-
-            <Divider />
-
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing='md'>
-              <Stack gap={6}>
-                <TagsInput
-                  label={t('form.allowedTypes')}
-                  description={t('form.allowedTypesHelp')}
-                  placeholder={t('form.allowedTypesPlaceholder')}
-                  splitChars={[',', ' ']}
-                  clearable
-                  {...form.getInputProps('allowedTypes')}
-                />
-              </Stack>
-              <Stack gap={6}>
-                <PasswordInput
-                  label={t('form.password')}
-                  description={editing ? t('form.passwordEditHelp') : t('form.passwordHelp')}
-                  disabled={form.values.removePassword}
-                  {...form.getInputProps('password')}
-                />
-                {editing?.passwordProtected && (
-                  <Switch
-                    label={t('form.removePassword')}
-                    {...form.getInputProps('removePassword', { type: 'checkbox' })}
-                  />
-                )}
-              </Stack>
-            </SimpleGrid>
-
-            <Group justify='space-between' align='flex-end' wrap='wrap'>
-              <Switch
-                label={t('form.enabled')}
-                description={t('form.enabledHelp')}
-                {...form.getInputProps('enabled', { type: 'checkbox' })}
-              />
-              <Group gap='sm'>
-                <Button variant='default' onClick={() => setModalOpen(false)}>
-                  {t('common:actions.cancel')}
-                </Button>
-                <Button type='submit' loading={form.submitting}>
-                  {t(editing ? 'form.save' : 'form.create')}
-                </Button>
-              </Group>
-            </Group>
+            <Button
+              type='submit'
+              variant='outline'
+              fullWidth
+              loading={form.submitting}
+              leftSection={editing ? <IconPencil size='1rem' /> : <IconPlus size='1rem' />}
+            >
+              {t(editing ? 'form.save' : 'form.create')}
+            </Button>
           </Stack>
         </form>
       </Modal>
 
-      <Group justify='space-between' align='flex-start' mb='md'>
-        <div>
-          <Title order={1}>{t('title')}</Title>
-          <Text c='dimmed'>{t('description')}</Text>
-        </div>
-        <Button leftSection={<IconPlus size='1rem' />} onClick={openCreate}>
+      <Group>
+        <Title>{t('title')}</Title>
+
+        <Button
+          variant='outline'
+          size='compact-sm'
+          leftSection={<IconPlus size='1rem' />}
+          onClick={openCreate}
+        >
           {t('create')}
         </Button>
       </Group>
+      <Text c='dimmed' size='sm' mt={4} mb='md'>
+        {t('description')}
+      </Text>
 
       {error ? (
         <Alert color='red' title={t('loadError')}>
