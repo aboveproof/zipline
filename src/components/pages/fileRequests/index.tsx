@@ -2,6 +2,7 @@ import FolderComboboxOptions from '@/components/folders/FolderComboboxOptions';
 import { Response } from '@/lib/api/response';
 import { bytes } from '@/lib/bytes';
 import { useFolders } from '@/lib/client/hooks/useFolders';
+import { useFileNavStore } from '@/lib/client/store/fileNav';
 import { fetchApi } from '@/lib/fetchApi';
 import {
   DEFAULT_FILE_REQUEST_ROUTE,
@@ -62,11 +63,13 @@ import {
   IconTextCaption,
   IconTrash,
 } from '@tabler/icons-react';
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
+import { useShallow } from 'zustand/shallow';
 
 const DashboardFile = lazy(() => import('@/components/file/DashboardFile'));
+const FileViewer = lazy(() => import('@/components/file/DashboardFile/FileViewer'));
 
 type FileRequestList = Extract<Response['/api/user/file-requests'], any[]>;
 type FileRequest = FileRequestList[number];
@@ -148,6 +151,17 @@ export default function DashboardFileRequests() {
   const { data: viewingFiles, isLoading: viewingFilesLoading } = useSWR<Response['/api/user/files']>(
     viewing ? `/api/user/files?fileRequest=${viewing.id}&page=${filesPage}&perpage=15` : null,
   );
+
+  const [currentFileId, setCurrentFileId, setNavFiles] = useFileNavStore(
+    useShallow((state) => [state.current, state.setCurrent, state.setFiles]),
+  );
+  const viewingFileIds = useMemo(() => (viewingFiles?.page ?? []).map((file) => file.id), [viewingFiles?.page]);
+  const activeViewingFile =
+    viewing && currentFileId ? (viewingFiles?.page.find((file) => file.id === currentFileId) ?? null) : null;
+
+  useEffect(() => {
+    if (viewing) setNavFiles(viewingFileIds);
+  }, [viewing, viewingFileIds, setNavFiles]);
 
   const folderCombobox = useCombobox();
   const [folderSearch, setFolderSearch] = useState('');
@@ -293,12 +307,24 @@ export default function DashboardFileRequests() {
 
   return (
     <>
+      <Suspense fallback={null}>
+        <FileViewer
+          open={!!activeViewingFile}
+          setOpen={(open) => {
+            if (!open) setCurrentFileId(null);
+          }}
+          file={activeViewingFile}
+          sequenced
+        />
+      </Suspense>
+
       <Modal
         size='xl'
         zIndex={100}
         centered
         opened={!!viewing}
         onClose={() => {
+          setCurrentFileId(null);
           setViewing(null);
           void mutate();
         }}
@@ -315,7 +341,7 @@ export default function DashboardFileRequests() {
             <SimpleGrid my='sm' spacing='md' cols={{ base: 1, md: 2, lg: 3 }} pos='relative'>
               {viewingFiles.page.map((file) => (
                 <Suspense fallback={<Skeleton height={240} animate />} key={file.id}>
-                  <DashboardFile file={file} />
+                  <DashboardFile file={file} onOpen={(fileId) => setCurrentFileId(fileId)} />
                 </Suspense>
               ))}
             </SimpleGrid>

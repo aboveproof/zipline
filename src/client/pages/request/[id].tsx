@@ -15,6 +15,7 @@ import {
   Container,
   Divider,
   Group,
+  Pagination,
   Paper,
   PasswordInput,
   SimpleGrid,
@@ -29,6 +30,8 @@ import { useTranslation } from 'react-i18next';
 import { data, Params, useLoaderData } from 'react-router-dom';
 
 type PublicRequest = Extract<Response['/api/file-request/[id]'], { open: boolean }>;
+
+const FILES_PER_PAGE = 10;
 
 export async function loader({ params }: { params: Params<string> }) {
   const route = params.route ? `/${params.route}` : '/request';
@@ -50,9 +53,17 @@ export function Component() {
   const { request: initialRequest, config } = useLoaderData<typeof loader>();
   const [refreshedState, setRefreshedState] = useState<{ id: string; request: PublicRequest } | null>(null);
   const [tokenState, setTokenState] = useState<{ id: string; token: string } | null>(null);
+  const [filesPage, setFilesPage] = useState(1);
 
   const request = refreshedState?.id === initialRequest.id ? refreshedState.request : initialRequest;
   const token = tokenState?.id === initialRequest.id ? tokenState.token : undefined;
+  const receivedList = request.files ?? [];
+  const totalFilesPages = Math.max(1, Math.ceil(receivedList.length / FILES_PER_PAGE));
+  const currentFilesPage = Math.min(filesPage, totalFilesPages);
+  const pagedReceivedFiles = receivedList.slice(
+    (currentFilesPage - 1) * FILES_PER_PAGE,
+    currentFilesPage * FILES_PER_PAGE,
+  );
 
   const refreshRequest = useCallback(
     async (accessToken?: string) => {
@@ -202,37 +213,49 @@ export function Component() {
                 {request.files?.length ?? request.receivedFiles}
               </Badge>
             </Group>
-            {request.files?.length ? (
-              <Stack gap={0}>
-                {request.files.map((file, index) => (
-                  <div key={file.id}>
-                    {index > 0 && <Divider my='xs' />}
-                    <Group justify='space-between' wrap='nowrap' gap='sm'>
-                      <div style={{ minWidth: 0 }}>
-                        <Anchor
-                          href={file.url}
-                          target='_blank'
-                          rel='noreferrer'
-                          fw={500}
-                          size='sm'
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%' }}
-                        >
-                          <Text span truncate>
-                            {file.originalName ?? file.name}
+            {receivedList.length ? (
+              <>
+                <Stack gap={0}>
+                  {pagedReceivedFiles.map((file, index) => (
+                    <div key={file.id}>
+                      {index > 0 && <Divider my='xs' />}
+                      <Group justify='space-between' wrap='nowrap' gap='sm'>
+                        <div style={{ minWidth: 0 }}>
+                          <Anchor
+                            href={file.url}
+                            target='_blank'
+                            rel='noreferrer'
+                            fw={500}
+                            size='sm'
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%' }}
+                          >
+                            <Text span truncate>
+                              {file.originalName ?? file.name}
+                            </Text>
+                            <IconExternalLink size='0.85rem' style={{ flex: '0 0 auto' }} />
+                          </Anchor>
+                          <Text c='dimmed' size='xs'>
+                            {new Date(file.createdAt).toLocaleString()}
                           </Text>
-                          <IconExternalLink size='0.85rem' style={{ flex: '0 0 auto' }} />
-                        </Anchor>
-                        <Text c='dimmed' size='xs'>
-                          {new Date(file.createdAt).toLocaleString()}
+                        </div>
+                        <Text c='dimmed' size='xs' style={{ flex: '0 0 auto' }}>
+                          {bytes(file.size)}
                         </Text>
-                      </div>
-                      <Text c='dimmed' size='xs' style={{ flex: '0 0 auto' }}>
-                        {bytes(file.size)}
-                      </Text>
-                    </Group>
-                  </div>
-                ))}
-              </Stack>
+                      </Group>
+                    </div>
+                  ))}
+                </Stack>
+                {totalFilesPages > 1 && (
+                  <Center mt='md'>
+                    <Pagination
+                      value={currentFilesPage}
+                      onChange={setFilesPage}
+                      total={totalFilesPages}
+                      size='sm'
+                    />
+                  </Center>
+                )}
+              </>
             ) : (
               <Text c='dimmed' size='sm'>
                 {t('public.noReceivedFiles')}
