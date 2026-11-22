@@ -160,9 +160,7 @@ export default function DashboardFileRequests() {
     [viewingFiles?.page],
   );
   const activeViewingFile =
-    viewing && currentFileId
-      ? (viewingFiles?.page.find((file) => file.id === currentFileId) ?? null)
-      : null;
+    viewing && currentFileId ? (viewingFiles?.page.find((file) => file.id === currentFileId) ?? null) : null;
 
   useEffect(() => {
     if (viewing) setNavFiles(viewingFileIds);
