@@ -1,3 +1,9 @@
+export const FILE_REQUEST_VANITY_REGEX = /^[a-zA-Z0-9_-]+$/;
+
+export function isValidFileRequestVanity(value: string) {
+  return FILE_REQUEST_VANITY_REGEX.test(value);
+}
+
 export function normalizeAllowedTypes(types: string[]) {
   return [
     ...new Set(

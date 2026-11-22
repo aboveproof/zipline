@@ -1,7 +1,12 @@
 import { ApiError } from '@/lib/api/errors';
 import { hashPassword } from '@/lib/crypto';
 import { db } from '@/lib/db';
-import { fileRequestSchema, listFileRequests, normalizeAllowedTypes } from '@/lib/db/models/fileRequest';
+import {
+  fileRequestIdentifierExists,
+  fileRequestSchema,
+  listFileRequests,
+  normalizeAllowedTypes,
+} from '@/lib/db/models/fileRequest';
 import { getFolderMetadata } from '@/lib/db/models/folder';
 import { fileRequests } from '@/lib/db/schema';
 import { log } from '@/lib/logger';
@@ -31,10 +36,17 @@ export default typedPlugin(
       },
       async (req, res) => {
         const current = await db.query.fileRequests.findFirst({
-          columns: { maxBytes: true, closeAtBytes: true, expiresAt: true },
+          columns: { maxBytes: true, closeAtBytes: true, expiresAt: true, vanity: true },
           where: { id: req.params.id, userId: req.user.id },
         });
         if (!current) throw new ApiError(4012);
+
+        if (
+          req.body.vanity &&
+          req.body.vanity !== current.vanity &&
+          (await fileRequestIdentifierExists(req.body.vanity, req.params.id))
+        )
+          throw new ApiError(1042);
 
         if (
           req.body.expiresAt &&
@@ -56,6 +68,7 @@ export default typedPlugin(
 
         const update: Partial<typeof fileRequests.$inferInsert> = {};
         if (req.body.name !== undefined) update.name = req.body.name;
+        if (req.body.vanity !== undefined) update.vanity = req.body.vanity ?? null;
         if (req.body.description !== undefined) update.description = req.body.description || null;
         if (req.body.enabled !== undefined) update.enabled = req.body.enabled;
         if (req.body.expiresAt !== undefined) update.expiresAt = req.body.expiresAt;

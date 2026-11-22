@@ -2,6 +2,7 @@ import { ApiError } from '@/lib/api/errors';
 import { hashPassword } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import {
+  fileRequestIdentifierExists,
   fileRequestSchema,
   listFileRequests,
   normalizeAllowedTypes,
@@ -9,6 +10,7 @@ import {
 } from '@/lib/db/models/fileRequest';
 import { getFolderMetadata } from '@/lib/db/models/folder';
 import { fileRequests } from '@/lib/db/schema';
+import { isValidFileRequestVanity } from '@/lib/fileRequestTypes';
 import { log } from '@/lib/logger';
 import { zStringTrimmed } from '@/lib/validation';
 import { userMiddleware } from '@/server/middleware/user';
@@ -19,6 +21,16 @@ export type ApiUserFileRequestsResponse = FileRequest[] | FileRequest;
 
 export const fileRequestInputSchema = z.object({
   name: zStringTrimmed.min(1).max(120),
+  vanity: z
+    .string()
+    .trim()
+    .max(100)
+    .refine(
+      (str) => str === '' || isValidFileRequestVanity(str),
+      'Vanity can only contain letters, numbers, hyphens, and underscores.',
+    )
+    .transform((str) => (str === '' ? null : str))
+    .nullish(),
   description: z.string().trim().max(2000).nullish(),
   enabled: z.boolean().optional(),
   password: z.string().max(256).nullish(),
@@ -84,11 +96,14 @@ export default typedPlugin(
           if (!folder || folder.userId !== req.user.id) throw new ApiError(4001);
         }
 
+        if (req.body.vanity && (await fileRequestIdentifierExists(req.body.vanity))) throw new ApiError(1042);
+
         const [created] = await db
           .insert(fileRequests)
           .values({
             userId: req.user.id,
             name: req.body.name,
+            vanity: req.body.vanity ?? null,
             description: req.body.description || null,
             enabled: req.body.enabled ?? true,
             password: req.body.password ? await hashPassword(req.body.password) : null,

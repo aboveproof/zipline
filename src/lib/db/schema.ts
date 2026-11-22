@@ -224,6 +224,7 @@ export const fileRequests = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     name: text().notNull(),
+    vanity: text(),
     description: text(),
     enabled: boolean().default(true).notNull(),
     password: text(),
@@ -247,6 +248,7 @@ export const fileRequests = pgTable(
   },
   (table) => [
     primaryKey({ name: 'file_request_pkey', columns: [table.id] }),
+    uniqueIndex('file_request_vanity_key').on(table.vanity),
     index('file_request_user_id_created_at_idx').on(table.userId, table.createdAt),
     index('file_request_folder_id_idx').on(table.folderId),
   ],

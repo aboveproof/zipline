@@ -1,6 +1,14 @@
 import { fileRequestAccepts, fileRequestIsOpen, normalizeAllowedTypes } from '@/lib/db/models/fileRequest';
+import { isValidFileRequestVanity } from '@/lib/fileRequestTypes';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+
+test('file request vanity validation accepts URL-safe slugs and rejects slashes or spaces', () => {
+  assert.equal(isValidFileRequestVanity('wedding-photos_2026'), true);
+  assert.equal(isValidFileRequestVanity('client/files'), false);
+  assert.equal(isValidFileRequestVanity('my photos'), false);
+  assert.equal(isValidFileRequestVanity(''), false);
+});
 
 test('file request type rules normalize extensions and MIME types', () => {
   assert.deepEqual(normalizeAllowedTypes([' .PNG, jpg ', 'image/*', 'application/pdf', 'jpg']), [

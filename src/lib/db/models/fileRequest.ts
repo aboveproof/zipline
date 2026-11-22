@@ -3,7 +3,7 @@ import { ApiError } from '@/lib/api/errors';
 import { db, type DbClient } from '@/lib/db';
 import { fileRequests, files, folders } from '@/lib/db/schema';
 import { fileRequestAccepts, normalizeAllowedTypes } from '@/lib/fileRequestTypes';
-import { and, count, desc, eq, getColumns, isNotNull, sql, sum } from 'drizzle-orm';
+import { and, count, desc, eq, getColumns, isNotNull, ne, or, sql, sum } from 'drizzle-orm';
 import { createSelectSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 
@@ -23,6 +23,7 @@ export const fileRequestSchema = fileRequestScalarSchema.extend({
 export const publicFileRequestSchema = fileRequestSchema
   .pick({
     id: true,
+    vanity: true,
     name: true,
     description: true,
     expiresAt: true,
@@ -71,6 +72,37 @@ export async function listFileRequests(userId: string, id?: string, client: DbCl
     .where(and(eq(fileRequests.userId, userId), id ? eq(fileRequests.id, id) : undefined))
     .groupBy(...Object.values(fileRequestColumns), fileRequests.password, folders.name)
     .orderBy(desc(fileRequests.createdAt));
+}
+
+export async function findFileRequestBySlug(slug: string, client: DbClient = db) {
+  const [request] = await client
+    .select({
+      id: fileRequests.id,
+      userId: fileRequests.userId,
+      enabled: fileRequests.enabled,
+      expiresAt: fileRequests.expiresAt,
+      password: fileRequests.password,
+    })
+    .from(fileRequests)
+    .where(or(eq(fileRequests.id, slug), eq(fileRequests.vanity, slug)))
+    .limit(1);
+
+  return request ?? null;
+}
+
+export async function fileRequestIdentifierExists(
+  identifier: string,
+  excludeId?: string,
+  client: DbClient = db,
+) {
+  const condition = or(eq(fileRequests.id, identifier), eq(fileRequests.vanity, identifier));
+  const [existing] = await client
+    .select({ id: fileRequests.id })
+    .from(fileRequests)
+    .where(excludeId ? and(condition, ne(fileRequests.id, excludeId)) : condition)
+    .limit(1);
+
+  return Boolean(existing);
 }
 
 export async function getFileRequestUploadContext(

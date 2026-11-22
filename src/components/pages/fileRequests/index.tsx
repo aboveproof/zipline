@@ -3,6 +3,7 @@ import { Response } from '@/lib/api/response';
 import { bytes } from '@/lib/bytes';
 import { useFolders } from '@/lib/client/hooks/useFolders';
 import { fetchApi } from '@/lib/fetchApi';
+import { isValidFileRequestVanity } from '@/lib/fileRequestTypes';
 import { buildFolderHierarchy } from '@/lib/folderHierarchy';
 import {
   ActionIcon,
@@ -48,6 +49,7 @@ import {
   IconFilter,
   IconFolderPlus,
   IconKey,
+  IconLink,
   IconPencil,
   IconPlus,
   IconTextCaption,
@@ -62,6 +64,7 @@ type FileRequest = FileRequestList[number];
 
 type FormValues = {
   name: string;
+  vanity: string;
   description: string;
   enabled: boolean;
   password: string;
@@ -100,6 +103,7 @@ function editableSize(value: number | null): { amount: number | string; unit: Si
 
 const initialValues: FormValues = {
   name: '',
+  vanity: '',
   description: '',
   enabled: true,
   password: '',
@@ -138,6 +142,10 @@ export default function DashboardFileRequests() {
     initialValues,
     validate: {
       name: (value) => (value.trim() ? null : t('form.nameRequired')),
+      vanity: (value) => {
+        const trimmed = value.trim();
+        return !trimmed || isValidFileRequestVanity(trimmed) ? null : t('form.vanityInvalid');
+      },
       maxFiles: (value, values) => (values.maxFilesEnabled && value === '' ? t('form.limitRequired') : null),
       storageLimit: (value, values) =>
         values.storageLimitEnabled && value === '' ? t('form.limitRequired') : null,
@@ -174,6 +182,7 @@ export default function DashboardFileRequests() {
     setEditing(request);
     form.setValues({
       name: request.name,
+      vanity: request.vanity ?? '',
       description: request.description ?? '',
       enabled: request.enabled,
       password: '',
@@ -199,6 +208,7 @@ export default function DashboardFileRequests() {
   const submit = form.onSubmit(async (values) => {
     const payload = {
       name: values.name.trim(),
+      vanity: values.vanity.trim() || null,
       description: values.description.trim() || null,
       enabled: values.enabled,
       expiresAt: values.expiresEnabled ? (values.expiresAt?.toISOString() ?? null) : null,
@@ -273,6 +283,14 @@ export default function DashboardFileRequests() {
               placeholder={t('form.namePlaceholder')}
               leftSection={<IconTextCaption size='1rem' />}
               {...form.getInputProps('name')}
+            />
+
+            <TextInput
+              label={t('form.vanity')}
+              description={t('form.vanityHelp')}
+              placeholder={t('form.vanityPlaceholder')}
+              leftSection={<IconLink size='1rem' />}
+              {...form.getInputProps('vanity')}
             />
 
             <Textarea
@@ -539,7 +557,7 @@ export default function DashboardFileRequests() {
               (request.maxFiles !== null && request.receivedFiles >= request.maxFiles) ||
               (request.closeAtBytes !== null && request.receivedBytes >= request.closeAtBytes);
             const open = request.enabled && !expired && !full;
-            const url = `${window.location.origin}/request/${request.id}`;
+            const url = `${window.location.origin}/request/${request.vanity ?? request.id}`;
             const closingRules = [
               request.maxFiles !== null ? t('card.closesAfterFiles', { count: request.maxFiles }) : null,
               request.closeAtBytes !== null

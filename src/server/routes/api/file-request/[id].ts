@@ -1,9 +1,9 @@
 import { createAccessToken } from '@/lib/accessToken';
 import { ApiError } from '@/lib/api/errors';
 import { verifyPassword } from '@/lib/crypto';
-import { db } from '@/lib/db';
 import {
   fileRequestIsOpen,
+  findFileRequestBySlug,
   listFileRequests,
   publicFileRequestSchema,
   type PublicFileRequest,
@@ -29,13 +29,10 @@ export default typedPlugin(
         },
       },
       async (req, res) => {
-        const row = await db.query.fileRequests.findFirst({
-          columns: { userId: true },
-          where: { id: req.params.id },
-        });
+        const row = await findFileRequestBySlug(req.params.id);
         if (!row) throw new ApiError(4012);
 
-        const [request] = await listFileRequests(row.userId, req.params.id);
+        const [request] = await listFileRequests(row.userId, row.id);
         if (!request) throw new ApiError(4012);
 
         const open = fileRequestIsOpen(request);
@@ -56,10 +53,7 @@ export default typedPlugin(
         ...secondlyRatelimit(2),
       },
       async (req, res) => {
-        const request = await db.query.fileRequests.findFirst({
-          columns: { id: true, userId: true, enabled: true, expiresAt: true, password: true },
-          where: { id: req.params.id },
-        });
+        const request = await findFileRequestBySlug(req.params.id);
         if (!request) throw new ApiError(4012);
         const [summary] = await listFileRequests(request.userId, request.id);
         if (!summary || !fileRequestIsOpen(summary)) throw new ApiError(1073);
